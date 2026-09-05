@@ -1,11 +1,314 @@
-* {
-    box-sizing: border-box;
+:root {
+    --bg-main: #14171d;
+    --bg-console: linear-gradient(135deg, #282d38 0%, #1a1e26 100%);
+    --bg-deck: linear-gradient(to bottom, #303745 0%, #20252f 100%);
+    --text-color: #c5d0d8;
+    --border-color: #0d0f13;
+    --lcd-bg: #0a0d12;
+    --lcd-text: #fff;
+    --sidebar-bg: #0d1117;
+    --card-bg: linear-gradient(135deg, #161b22 0%, #11151d 100%);
+    --card-border: #30363d;
+    --toolbar-bg: #191e28;
+    --stat-bg: #11151d;
+    --button-bg: linear-gradient(to bottom, #3b4455 0%, #252c38 100%);
+    --button-text: #e2e8f0;
 }
 
-html, body, #map {
-    width: 100%;
-    height: 100vh;
+[data-theme="light"] {
+    --bg-main: #f0f2f5;
+    --bg-console: linear-gradient(135deg, #e4e9f0 0%, #cbd5e1 100%);
+    --bg-deck: linear-gradient(to bottom, #ffffff 0%, #e2e8f0 100%);
+    --text-color: #1e293b;
+    --border-color: #94a3b8;
+    --lcd-bg: #ffffff;
+    --lcd-text: #0284c7;
+    --sidebar-bg: #ffffff;
+    --card-bg: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    --card-border: #cbd5e1;
+    --toolbar-bg: #e2e8f0;
+    --stat-bg: #ffffff;
+    --button-bg: linear-gradient(to bottom, #ffffff 0%, #cbd5e1 100%);
+    --button-text: #0f172a;
+}
+
+* {
+    box-sizing: border-box;
     margin: 0;
     padding: 0;
-    background: #121212;
+}
+
+body, html {
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--bg-main);
+    color: var(--text-color);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+#radio-console {
+    display: flex;
+    flex-direction: column;
+    width: 100vw;
+    height: 100vh;
+    border: 4px solid var(--border-color);
+    background: var(--bg-console);
+}
+
+#transceiver-deck {
+    background: var(--bg-deck);
+    border-bottom: 2px solid var(--border-color);
+    padding: 10px 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 1000;
+}
+
+.deck-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.brand-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--stat-bg);
+    padding: 6px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--card-border);
+}
+
+.power-led {
+    width: 8px;
+    height: 8px;
+    background: #ff3333;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #ff3333;
+}
+
+.power-led.active {
+    background: #00ff66;
+    box-shadow: 0 0 10px #00ff66;
+}
+
+.rig-name {
+    font-size: 0.8rem;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+
+.status-badge {
+    font-size: 0.65rem;
+    background: #1a7f37;
+    color: #fff;
+    padding: 2px 6px;
+    border-radius: 2px;
+}
+
+.lcd-frequency-display {
+    background: var(--lcd-bg);
+    box-shadow: inset 0 0 2px 1px var(--card-border);
+    padding: 6px 20px;
+    border-radius: 6px;
+    text-align: center;
+}
+
+.freq-label {
+    display: block;
+    font-size: 0.6rem;
+    color: var(--text-color);
+    opacity: 0.7;
+    letter-spacing: 1px;
+}
+
+.freq-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--lcd-text);
+    letter-spacing: 2px;
+}
+
+.freq-unit {
+    font-size: 0.8rem;
+    color: var(--lcd-text);
+    margin-left: 4px;
+}
+
+.deck-controls-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.control-btn {
+    background: var(--button-bg);
+    border: 1px solid var(--card-border);
+    color: var(--button-text);
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+.control-btn:focus-visible, .band-btn:focus-visible {
+    outline: 2px solid #00ffcc;
+    outline-offset: 2px;
+}
+
+.deck-clock {
+    background: var(--stat-bg);
+    border: 1px solid var(--card-border);
+    padding: 8px 14px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+
+.deck-toolbar {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    margin-bottom: 8px;
+    background: var(--toolbar-bg);
+    padding: 6px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--card-border);
+}
+
+.s-meter-container {
+    flex-grow: 1;
+}
+
+.meter-label {
+    font-size: 0.65rem;
+    margin-bottom: 3px;
+    opacity: 0.8;
+}
+
+.meter-track {
+    background: var(--lcd-bg);
+    height: 8px;
+    border-radius: 2px;
+    border: 1px solid var(--card-border);
+    overflow: hidden;
+}
+
+.meter-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #238636 0%, #d29922 75%, #f85149 100%);
+    transition: width 0.4s ease;
+}
+
+.toolbar-stat {
+    background: var(--stat-bg);
+    padding: 4px 12px;
+    border-radius: 3px;
+    border: 1px solid var(--card-border);
+    text-align: center;
+}
+
+.t-label {
+    display: block;
+    font-size: 0.55rem;
+    opacity: 0.8;
+}
+
+.t-val {
+    font-size: 0.85rem;
+    font-weight: bold;
+}
+
+.band-matrix {
+    display: flex;
+    gap: 6px;
+}
+
+.band-btn {
+    flex: 1;
+    background: var(--button-bg);
+    border: 1px solid var(--card-border);
+    color: var(--button-text);
+    padding: 6px 0;
+    font-size: 0.75rem;
+    font-weight: bold;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.1s ease;
+}
+
+.band-btn.active {
+    border-color: #00ffcc;
+    color: #00ffcc;
+}
+
+#workspace {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    flex-grow: 1;
+    height: calc(100vh - 130px);
+    position: relative;
+    overflow: hidden;
+}
+
+#sidebar {
+    background: var(--sidebar-bg);
+    border-right: 2px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.sidebar-sec-title {
+    background: var(--toolbar-bg);
+    padding: 10px 16px;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    border-bottom: 1px solid var(--card-border);
+    font-weight: bold;
+}
+
+#spots-list {
+    padding: 12px;
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+.spot-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-left: 4px solid #00ffcc;
+    padding: 10px;
+    margin-bottom: 8px;
+    border-radius: 3px;
+    font-size: 0.78rem;
+}
+
+.spot-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+    font-size: 0.68rem;
+    opacity: 0.8;
+}
+
+.spot-route {
+    font-weight: bold;
+    font-size: 0.85rem;
+}
+
+#map {
+    width: 100%;
+    height: 100%;
+    background: var(--lcd-bg);
+    z-index: 1;
+}
+
+@media (max-width: 768px) {
+    #workspace {
+        grid-template-columns: 1fr;
+        grid-template-rows: 200px 1fr;
+    }
 }

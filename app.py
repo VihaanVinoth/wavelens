@@ -1,7 +1,39 @@
-from flask import Flask, jsonify, render_template
+from flask import Flask, render_template, jsonify, request
 import requests
+import xml.etree.ElementTree as ET
 
 app = Flask(__name__)
+
+BAND_RANGES = {
+    '20m': (14000000, 14100000),
+    '40m': (7000000, 7150000),
+    '30m': (10100000, 10150000),
+    '15m': (21000000, 21150000),
+    '10m': (28000000, 28200000),
+    '80m': (3500000, 3600000)
+}
+
+def maidenhead_to_latlon(locator):
+    """Convert a Maidenhead grid locator (e.g., QF22) into latitude and longitude."""
+    if not locator or len(locator) < 4:
+        return None, None
+    locator = locator.upper()
+    try:
+        lon = (ord(locator[0]) - ord('A')) * 20 - 180
+        lat = (ord(locator[1]) - ord('A')) * 10 - 90
+        lon += int(locator[2]) * 2
+        lat += int(locator[3]) * 1
+        if len(locator) >= 6:
+            lon += (ord(locator[4]) - ord('A')) / 12.0
+            lat += (ord(locator[5]) - ord('A')) / 24.0
+            lon += 1.0 / 24.0
+            lat += 1.0 / 48.0
+        else:
+            lon += 1.0
+            lat += 0.5
+        return lat, lon
+    except Exception:
+        return None, None
 
 @app.route('/')
 def index():
@@ -9,32 +41,48 @@ def index():
 
 @app.route('/api/spots')
 def get_spots():
-    url = "https://retrieve.v2.pskreporter.info/query?grid=QF22&noLocatorDetails=1&rronly=1&enc=json"
-
+    band = request.args.get('band', '20m')
+    freq_range = BAND_RANGES.get(band, BAND_RANGES['20m'])
+    
+    url = f"https://retrieve.pskreporter.info/query?frange={freq_range[0]}-{freq_range[1]}&flowStartSeconds=-7200&rronly=1"
+    
+    headers = {
+        'User-Agent': 'WaveLens-SDR-Telemetry/1.0 (HackClub CQ Project; contact@hackclub.com)'
+    }
+    
+    spots = []
     try:
-        response = requests.get(url, timeout=5)
-        response.raise_for_status()
-
-        data = response.json()
-
-        spots = []
-        for rx in data.get('receptions', []):
-            spots.append({
-                "sender": rx.get('callsign'),
-                "receiver": rx.get('reporterCallsign'),
-                "lat1": rx.get('sLat'),
-                "lon1": rx.get('sLon'),
-                "lat2": rx.get('sLat'),
-                "lon2": rx.get('sLon'),
-                "snr": rx.get('sNR')
-            })
-
-        return jsonify(spots)
+        response = requests.get(url, headers=headers, timeout=8)
+        if response.status_code == 200:
+            root = ET.fromstring(response.content)
+            for report in root.findall('.//receptionReport'):
+                sender = report.get('senderCallsign')
+                receiver = report.get('receiverCallsign')
+                s_locator = report.get('senderLocator')
+                r_locator = report.get('receiverLocator')
+                freq = report.get('frequency')
+                snr = report.get('sNR')
+                mode = report.get('mode', 'FT8')
+                
+                lat1, lon1 = maidenhead_to_latlon(s_locator)
+                lat2, lon2 = maidenhead_to_latlon(r_locator)
+                
+                if lat1 is not None and lon1 is not None and lat2 is not None and lon2 is not None:
+                    spots.append({
+                        'sender': sender,
+                        'receiver': receiver,
+                        'lat1': lat1,
+                        'lon1': lon1,
+                        'lat2': lat2,
+                        'lon2': lon2,
+                        'frequency': int(freq) if freq else freq_range[0],
+                        'snr': int(snr) if snr else 0,
+                        'mode': mode
+                    })
     except Exception as e:
-        fallback_spots = [
-            {"sender": "VK3XYZ", "receiver": "VK2ABC", "lat1": -37.8, "lon1": 144.9, "lat2": -33.8, "lon2": 151.2, "snr": -15}
-        ]
-        return jsonify(fallback_spots)
+        print(f"Error connecting to PSK Reporter telemetry stream: {e}")
+        
+    return jsonify(spots[:100])
 
-if __name__ == "__main__":
-    app.run(debug=True, port=5001)
+if __name__ == '__main__':
+    app.run(debug=True)

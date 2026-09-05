@@ -1,14 +1,68 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WaveLens</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
 </head>
 <body>
-    <div id="map"></div>
+    <div id="radio-console">
+        <header id="transceiver-deck" role="region" aria-label="Transceiver Control Deck">
+            <div class="deck-top-row">
+                <div class="brand-badge">
+                    <span class="power-led active" aria-hidden="true"></span>
+                    <span class="rig-name">WAVELENS</span>
+                    <span class="status-badge">ONLINE</span>
+                </div>
+                <div class="lcd-frequency-display" aria-live="polite">
+                    <span class="freq-label">VFO A / REAL FREQ</span>
+                    <span class="freq-value" id="vfo-freq">14.074.00</span>
+                    <span class="freq-unit">MHz</span>
+                </div>
+                <div class="deck-controls-group">
+                    <button id="theme-toggle" class="control-btn" aria-label="Toggle Light and Dark Mode">Dark</button>
+                    <div class="deck-clock" id="utc-clock" aria-label="Current UTC Time">00:00:00 UTC</div>
+                </div>
+            </div>
+            <div class="deck-toolbar">
+                <div class="s-meter-container">
+                    <div class="meter-label" id="meter-label-id">S-METER / SNR</div>
+                    <div class="meter-track" role="progressbar" aria-labelledby="meter-label-id" aria-valuemin="-30" aria-valuemax="10" id="s-meter-progress">
+                        <div class="meter-bar" id="s-meter-bar" style="width: 45%;"></div>
+                    </div>
+                </div>
+                <div class="toolbar-stat">
+                    <span class="t-label">SPOTS</span>
+                    <span class="t-val" id="stat-count">0</span>
+                </div>
+                <div class="toolbar-stat">
+                    <span class="t-label">AVG SNR</span>
+                    <span class="t-val" id="stat-snr">0 dB</span>
+                </div>
+                <div class="toolbar-stat" style="display: flex; flex-direction: column; justify-content: center;">
+                    <span class="t-label">FILTER CALL</span>
+                    <input type="text" id="callsign-filter" placeholder="e.g. VK3..." style="background: var(--stat-bg); border: 1px solid var(--card-border); color: var(--text-color); padding: 2px 4px; border-radius: 2px; font-size: 0.75rem; width: 80px; text-transform: uppercase;" />
+                </div>
+            </div>
+            <nav class="band-matrix" aria-label="Band Selection Matrix">
+                <button class="band-btn active" data-band="20m" data-freq="14.074.00">20m</button>
+                <button class="band-btn" data-band="40m" data-freq="7.074.00">40m</button>
+                <button class="band-btn" data-band="30m" data-freq="10.136.00">30m</button>
+                <button class="band-btn" data-band="15m" data-freq="21.074.00">15m</button>
+                <button class="band-btn" data-band="10m" data-freq="28.180.00">10m</button>
+                <button class="band-btn" data-band="80m" data-freq="3.573.00">80m</button>
+            </nav>
+        </header>
+        <div id="workspace">
+            <aside id="sidebar" aria-label="Live Telemetry Sidebar">
+                <div class="sidebar-sec-title">LIVE TELEMETRY STREAM</div>
+                <div id="spots-list" tabindex="0">Acquiring ionospheric telemetry feed...</div>
+            </aside>
+            <main id="map" aria-label="Interactive Propagation Map" role="application"></main>
+        </div>
+    </div>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
