@@ -122,14 +122,25 @@ function renderSpots() {
 
         let freqMHz = spot.frequency ? (spot.frequency / 1000000).toFixed(3) : document.getElementById('vfo-freq').innerText;
 
+        // Sender Node Marker
         L.circleMarker([spot.lat1, spot.lon1], {
-            radius: 5,
+            radius: 4,
             color: '#00ffcc',
             fillColor: '#00ffcc',
             fillOpacity: 0.9,
             weight: 1
-        }).addTo(spotLayer).bindPopup(`<b>TX Call: ${spot.sender}</b><br>RX Call: ${spot.receiver}<br>Mode: ${spot.mode || 'FT8'}<br>Freq: ${freqMHz} MHz<br>SNR: ${snrVal} dB`);
+        }).addTo(spotLayer).bindPopup(`<b>TX Call: ${spot.sender}</b><br>Mode: ${spot.mode || 'FT8'}<br>Freq: ${freqMHz} MHz<br>SNR: ${snrVal} dB`);
 
+        // Receiver Node Marker (Fixes the "detached" line look)
+        L.circleMarker([spot.lat2, spot.lon2], {
+            radius: 4,
+            color: '#ff5555',
+            fillColor: '#ff5555',
+            fillOpacity: 0.9,
+            weight: 1
+        }).addTo(spotLayer).bindPopup(`<b>RX Call: ${spot.receiver}</b><br>Mode: ${spot.mode || 'FT8'}<br>Freq: ${freqMHz} MHz`);
+
+        // Propagation Path Line
         L.polyline([[spot.lat1, spot.lon1], [spot.lat2, spot.lon2]], {
             color: themes[currentThemeIndex] === 'dark' ? '#ff5555' : '#dc2626',
             weight: 1.5,
