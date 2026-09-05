@@ -1,7 +1,6 @@
 from flask import Flask, render_template, jsonify, request
 import requests
 import xml.etree.ElementTree as ET
-import random
 
 app = Flask(__name__)
 
@@ -27,35 +26,13 @@ def maidenhead_to_latlon(locator):
             lon += (ord(locator[4]) - ord('A')) / 12.0
             lat += (ord(locator[5]) - ord('A')) / 24.0
             lon += 1.0 / 24.0
-            lat += 1.0 / 48.0
+            lon += 1.0 / 48.0
         else:
             lon += 1.0
             lat += 0.5
         return lat, lon
     except Exception:
         return None, None
-
-def generate_mock_spots(freq_base):
-    """Provides fallback telemetry paths if the live API is unreachable or empty."""
-    mock_callsigns = ['VK3KQN', 'W6GPS', 'JA1XYZ', 'DL2ABC', 'ZL1ABC', 'N4DSP', 'G4XYZ', 'VE3WSS']
-    spots = []
-    for _ in range(35):
-        lat1 = random.uniform(-40, 60)
-        lon1 = random.uniform(-130, 140)
-        lat2 = lat1 + random.uniform(-15, 15)
-        lon2 = lon1 + random.uniform(-20, 20)
-        spots.append({
-            'sender': random.choice(mock_callsigns),
-            'receiver': random.choice(mock_callsigns),
-            'lat1': lat1,
-            'lon1': lon1,
-            'lat2': lat2,
-            'lon2': lon2,
-            'frequency': freq_base + random.randint(1000, 50000),
-            'snr': random.randint(-22, -2),
-            'mode': 'FT8'
-        })
-    return spots
 
 @app.route('/')
 def index():
@@ -100,9 +77,6 @@ def get_spots():
                     })
     except Exception as e:
         print(f"PSK Reporter query warning: {e}")
-        
-    if not spots:
-        spots = generate_mock_spots(freq_range[0])
         
     return jsonify(spots[:100])
 
