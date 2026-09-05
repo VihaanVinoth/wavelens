@@ -122,26 +122,29 @@ function renderSpots() {
 
         let freqMHz = spot.frequency ? (spot.frequency / 1000000).toFixed(3) : document.getElementById('vfo-freq').innerText;
 
-        L.circleMarker([spot.lat1, spot.lon1], {
-            radius: 4,
+        const p1 = [spot.lat1, spot.lon1];
+        const p2 = [spot.lat2, spot.lon2];
+
+        L.circleMarker(p1, {
+            radius: 4.5,
             color: '#00ffcc',
             fillColor: '#00ffcc',
-            fillOpacity: 0.9,
-            weight: 1
-        }).addTo(spotLayer).bindPopup(`<b>TX Call: ${spot.sender}</b><br>Mode: ${spot.mode || 'FT8'}<br>Freq: ${freqMHz} MHz<br>SNR: ${snrVal} dB`);
+            fillOpacity: 1,
+            weight: 1.5
+        }).addTo(spotLayer).bindPopup(`<b>TX: ${spot.sender}</b><br>Mode: ${spot.mode || 'FT8'}<br>Freq: ${freqMHz} MHz<br>SNR: ${snrVal} dB`);
 
-        L.circleMarker([spot.lat2, spot.lon2], {
-            radius: 4,
+        L.circleMarker(p2, {
+            radius: 4.5,
             color: '#ff5555',
             fillColor: '#ff5555',
-            fillOpacity: 0.9,
-            weight: 1
-        }).addTo(spotLayer).bindPopup(`<b>RX Call: ${spot.receiver}</b><br>Mode: ${spot.mode || 'FT8'}<br>Freq: ${freqMHz} MHz`);
+            fillOpacity: 1,
+            weight: 1.5
+        }).addTo(spotLayer).bindPopup(`<b>RX: ${spot.receiver}</b><br>Mode: ${spot.mode || 'FT8'}<br>Freq: ${freqMHz} MHz`);
 
-        L.polyline([[spot.lat1, spot.lon1], [spot.lat2, spot.lon2]], {
+        L.polyline([p1, p2], {
             color: themes[currentThemeIndex] === 'dark' ? '#ff5555' : '#dc2626',
             weight: 1.5,
-            opacity: 0.7
+            opacity: 0.75
         }).addTo(spotLayer);
 
         const card = document.createElement('div');
@@ -158,7 +161,7 @@ function renderSpots() {
 
     const avgSnr = Math.round(totalSnr / filteredData.length);
     document.getElementById('stat-snr').innerText = `${avgSnr >= 0 ? '+' : ''}${avgSnr} dB`;
-    
+
     let normalizedSnr = Math.min(Math.max(avgSnr, -25), 5);
     let meterPct = ((normalizedSnr + 25) / 30) * 100;
     meterPct = Math.max(meterPct, 10);
