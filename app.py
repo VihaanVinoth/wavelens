@@ -43,7 +43,7 @@ def debug_api():
     band = request.args.get('band', '20m')
     freq_range = BAND_RANGES.get(band, BAND_RANGES['20m'])
     url = f"https://retrieve.pskreporter.info/query?frange={freq_range[0]}-{freq_range[1]}&flowStartSeconds=-900&rronly=1&rptlimit=50"
-    headers = {'User-Agent': 'WaveLens-Telemetry-Console/2.0'}
+    headers = {'User-Agent': 'WaveLens-Telemetry-Console/2.0 (ham-radio-monitoring; contact: dalx900@gmail.com)'}
     try:
         res = requests.get(url, headers=headers, timeout=12)
         return res.text, res.status_code, {'Content-Type': 'text/plain'}
