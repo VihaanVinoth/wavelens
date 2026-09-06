@@ -43,17 +43,16 @@ def get_spots():
     band = request.args.get('band', '20m')
     freq_range = BAND_RANGES.get(band, BAND_RANGES['20m'])
     
-    url = f"https://retrieve.pskreporter.info/query?frange={freq_range[0]}-{freq_range[1]}&flowStartSeconds=-7200&rronly=1&rptlimit=100"
-    
-    headers = {'User-Agent': 'WaveLens-SDR-Telemetry/1.0 (contact@example.com)'}
+    # Using flowStartSeconds=-900 (15 min window) and rptlimit=200 for stable live retrieval
+    url = f"https://retrieve.pskreporter.info/query?frange={freq_range[0]}-{freq_range[1]}&flowStartSeconds=-900&rronly=1&rptlimit=200"
+    headers = {'User-Agent': 'WaveLens-Telemetry-Console/2.0'}
     
     spots = []
     try:
-        response = requests.get(url, headers=headers, timeout=8)
-        print(f"PSK Query URL: {url}")
-        print(f"Response Status: {response.status_code} | Content Length: {len(response.content)}")
+        response = requests.get(url, headers=headers, timeout=6)
+        print(f"[{band}] PSK HTTP Status: {response.status_code}, Bytes: {len(response.content)}")
         
-        if response.status_code == 200:
+        if response.status_code == 200 and len(response.content) > 50:
             root = ET.fromstring(response.content)
             for report in root.findall('.//receptionReport'):
                 sender = report.get('senderCallsign')
@@ -80,10 +79,10 @@ def get_spots():
                         'mode': mode
                     })
     except Exception as e:
-        print(f"Error fetching real telemetry: {e}")
+        print(f"Live telemetry stream error: {e}")
         
-    print(f"Successfully parsed {len(spots)} live spots.")
-    return jsonify(spots[:100])
+    print(f"Successfully loaded {len(spots)} live spots for {band}.")
+    return jsonify(spots)
 
 if __name__ == '__main__':
     app.run(debug=True)
