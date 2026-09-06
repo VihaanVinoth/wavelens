@@ -43,12 +43,16 @@ def get_spots():
     band = request.args.get('band', '20m')
     freq_range = BAND_RANGES.get(band, BAND_RANGES['20m'])
     
-    url = f"https://retrieve.pskreporter.info/query?frange={freq_range[0]}-{freq_range[1]}&flowStartSeconds=-7200&rronly=1"
-    headers = {'User-Agent': 'WaveLens-SDR-Telemetry/1.0'}
+    url = f"https://retrieve.pskreporter.info/query?frange={freq_range[0]}-{freq_range[1]}&flowStartSeconds=-7200&rronly=1&rptlimit=100"
+    
+    headers = {'User-Agent': 'WaveLens-SDR-Telemetry/1.0 (contact@example.com)'}
     
     spots = []
     try:
-        response = requests.get(url, headers=headers, timeout=5)
+        response = requests.get(url, headers=headers, timeout=8)
+        print(f"PSK Query URL: {url}")
+        print(f"Response Status: {response.status_code} | Content Length: {len(response.content)}")
+        
         if response.status_code == 200:
             root = ET.fromstring(response.content)
             for report in root.findall('.//receptionReport'):
@@ -76,8 +80,9 @@ def get_spots():
                         'mode': mode
                     })
     except Exception as e:
-        print(f"PSK Reporter query warning: {e}")
+        print(f"Error fetching real telemetry: {e}")
         
+    print(f"Successfully parsed {len(spots)} live spots.")
     return jsonify(spots[:100])
 
 if __name__ == '__main__':
