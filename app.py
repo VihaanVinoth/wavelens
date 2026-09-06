@@ -38,12 +38,24 @@ def maidenhead_to_latlon(locator):
 def index():
     return render_template('index.html')
 
+@app.route('/api/debug')
+def debug_api():
+    """Temporary debug route to view raw XML response in browser."""
+    band = request.args.get('band', '20m')
+    freq_range = BAND_RANGES.get(band, BAND_RANGES['20m'])
+    url = f"https://retrieve.pskreporter.info/query?frange={freq_range[0]}-{freq_range[1]}&flowStartSeconds=-900&rronly=1&rptlimit=50"
+    headers = {'User-Agent': 'WaveLens-Telemetry-Console/2.0'}
+    try:
+        res = requests.get(url, headers=headers, timeout=8)
+        return res.text, res.status_code, {'Content-Type': 'text/plain'}
+    except Exception as e:
+        return str(e), 500
+
 @app.route('/api/spots')
 def get_spots():
     band = request.args.get('band', '20m')
     freq_range = BAND_RANGES.get(band, BAND_RANGES['20m'])
     
-    # Using flowStartSeconds=-900 (15 min window) and rptlimit=200 for stable live retrieval
     url = f"https://retrieve.pskreporter.info/query?frange={freq_range[0]}-{freq_range[1]}&flowStartSeconds=-900&rronly=1&rptlimit=200"
     headers = {'User-Agent': 'WaveLens-Telemetry-Console/2.0'}
     
