@@ -56,7 +56,8 @@ def get_spots():
     freq_range = BAND_RANGES.get(band, BAND_RANGES['20m'])
     
     url = f"https://retrieve.pskreporter.info/query?frange={freq_range[0]}-{freq_range[1]}&flowStartSeconds=-900&rronly=1&rptlimit=200"
-    headers = {'User-Agent': 'WaveLens-Telemetry-Console/2.0'}
+    # Fixed: added contact info to the headers here as well
+    headers = {'User-Agent': 'WaveLens-Telemetry-Console/2.0 (ham-radio-monitoring; contact: dalx900@gmail.com)'}
     
     spots = []
     try:
