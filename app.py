@@ -3,14 +3,13 @@ import paho.mqtt.client as mqtt
 import json
 import threading
 from collections import deque
-import time
 import logging
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
 app = Flask(__name__)
 
-LATEST_SPOTS = deque(maxlen=100)
+LATEST_SPOTS = deque(maxlen=150)
 spots_lock = threading.Lock()
 
 def grid_to_latlon(grid):
@@ -27,12 +26,13 @@ def grid_to_latlon(grid):
     except Exception:
         return None, None
 
-def on_connect(client, userdata, flags, reason_code, properties):
-    if reason_code == 0:
+def on_connect(client, userdata, flags, reason_code, properties=None):
+    rc_value = reason_code.value if hasattr(reason_code, 'value') else reason_code
+    if rc_value == 0:
         logging.info("Connected successfully to PSK Reporter MQTT broker!")
         client.subscribe("pskr/filter/v2/+/+/+/+/+/+/+/+")
     else:
-        logging.warning(f"Failed to connect to MQTT broker, return code {reason_code}")
+        logging.warning(f"Failed to connect to MQTT broker, return code {rc_value}")
 
 def on_message(client, userdata, msg):
     try:
@@ -84,7 +84,7 @@ mqtt_thread.start()
 def index():
     return render_template('index.html')
 
-@app.route('/api/spots')
+@app.route('/api/spots', methods=['GET'])
 def get_spots():
     with spots_lock:
         spots_list = list(LATEST_SPOTS)

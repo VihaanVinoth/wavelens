@@ -1,173 +1,168 @@
 @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,100..700;1,100..700&family=Roboto:ital,wdth,wght@0,75,100..900;1,75,100..900&display=swap');
 
 :root {
-    --bg-main: #07090c;
-    --bg-console: #0e1217;
-    --bg-deck: #131820;
-    --text-color: #d1d5db;
-    --lcd-bg: #030406;
-    --sidebar-bg: #090d12;
-    --card-bg: #10151d;
-    --card-border: #1f2937;
-    --toolbar-bg: #0b0f16;
-    --stat-bg: #05070a;
-    --button-bg: #1a2332;
-    --button-text: #f3f4f6;
-    --accent-glow: #38bdf8;
+    --bg: #0d0f12;
+    --surface: #161a22;
+    --border: #2b3342;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --accent: #58a6ff;
+    --success: #3fb950;
+    --danger: #f85149;
 }
 
 [data-theme="light"] {
-    --bg-main: #e2e8f0;
-    --bg-console: #48fafc;
-    --bg-deck: #fff;
-    --text-color: #0f172a;
-    --border-color: #cbd5e1;
-    --lcd-bg: #0f172a;
-    --sidebar-bg: #f1f5f9;
-    --card-bg: #fff;
-    --card-border: #94a3b8;
-    --toolbar-bg: #e2e8f0;
-    --stat-bg: #f8fafc;
-    --button-bg: #cbd5e1;
-    --button-text: #0f172a;
-    --accent-glow: #0284c7;
+    --bg: #ffffff;
+    --surface: #f6f8fa;
+    --border: #5d768f;
+    --text: #24292f;
+    --text-dim: #57606a;
+    --accent: #0969da;
+    --success: #1a7f37;
+    --danger: #cf222e;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
 }
 
 body, html {
     width: 100%;
     height: 100vh;
     overflow: hidden;
-    background: var(--bg-main);
-    color: var(--text-color);
-    font-family: 'Roboto Mono', Courier, monospace, system-ui;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 12px;
 }
 
 #radio-console {
-    display: flex;
-    flex-direction: column;
+    position: relative;
     width: 100vw;
     height: 100vh;
-    border: 3px solid var(--border-color);
-    background: var(--bg-console);
+    overflow: hidden;
+}
+
+#map {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    background: var(--bg);
 }
 
 #transceiver-deck {
-    background: var(--bg-deck);
-    border-bottom: 1px solid var(--border-color);
-    padding: 12px 20px;
-    box-shadow: inset 0 2px 0 rgba(255,255,255,0.05);
-    z-index: 1000;
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    z-index: 10;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 10px 14px;
 }
 
 .deck-top-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 
 .brand-badge {
     display: flex;
     align-items: center;
-    gap: 10px;
-    background: var(--stat-bg);
-    padding: 6px 14px;
-    border: 1px solid var(--card-border);
+    gap: 8px;
+    background: var(--bg);
+    color: var(--text);
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    font-weight: 600;
+    letter-spacing: 0.05em;
 }
 
 .power-led {
-    width: 7.5px;
-    height: 7.5px;
-    border-radius: 50%;
-    background: #ef4444;
-    box-shadow: 0 0 6px #ef4444;
+    width: 6px;
+    height: 6px;
+    background: var(--danger);
 }
 
 .power-led.active {
-    background: #22c55e;
-    box-shadow: 0 0 10px #22c55e;
-}
-
-.rig-name {
-    font-size: 0.85rem;
-    font-weight: 900;
-    letter-spacing: 2px;
+    background: var(--success);
 }
 
 .status-badge {
-    font-size: 0.6rem;
-    background: #166534;
-    border-radius: 2px;
-    color: #4ade80;
-    padding: 2px 6px;
-    font-weight: bold;
-    letter-spacing: 1px;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
 }
 
 .lcd-frequency-display {
-    background: var(--lcd-bg);
-    border: 2px inset rgba(255,255,255,0.05);
-    padding: 8px 24px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 4px 16px;
     text-align: center;
 }
 
 .freq-label {
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
     display: block;
-    font-size: 0.55rem;
-    opacity: 0.6;
-    letter-spacing: 2px;
 }
 
 .freq-value {
-    font-size: 1.6rem;
-    font-weight: 900;
-    letter-spacing: 3px;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.05em;
 }
 
 .freq-unit {
     font-size: 0.75rem;
-    margin-left: 6px;
+    color: var(--accent);
+    margin-left: 2px;
 }
 
 .deck-controls-group {
     display: flex;
-    gap: 10px;
+    gap: 6px;
     align-items: center;
 }
 
 .control-btn {
-    background: transparent;
-    border: 1px solid var(--card-border);
-    color: var(--button-text);
-    padding: 8px 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 5px 10px;
     cursor: pointer;
-    font-size: 0.75rem;
-    font-weight: bold;
-    letter-spacing: 1px;
-    text-transform: uppercase;
+    font-family: inherit;
+    font-size: 11px;
 }
 
 .control-btn:hover {
-    border-color: var(--accent-glow);
-    background-color: var(--button-bg);
+    border-color: var(--text);
 }
 
 .deck-clock {
-    background: var(--stat-bg);
-    border: 1px solid var(--card-border);
-    padding: 8px 12px;
-    font-size: 0.8rem;
-    font-weight: bold;
+    background: var(--bg);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    padding: 5px 8px;
 }
 
 .deck-toolbar {
     display: flex;
-    gap: 16px;
+    gap: 12px;
     align-items: center;
-    margin-bottom: 10px;
-    background: var(--toolbar-bg);
-    padding: 8px 14px;
-    border: 1px solid var(--card-border);
+    background: var(--bg);
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    margin-bottom: 6px;
 }
 
 .s-meter-container {
@@ -175,132 +170,143 @@ body, html {
 }
 
 .meter-label {
-    font-size: 0.6rem;
-    margin-bottom: 4px;
-    letter-spacing: 1px;
-    opacity: 0.8;
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-bottom: 2px;
 }
 
 .meter-track {
-    background: var(--lcd-bg);
-    height: 10px;
-    border: 1px solid var(--card-border);
+    background: var(--surface);
+    height: 4px;
+    border: 1px solid var(--border);
     overflow: hidden;
 }
 
 .meter-bar {
     height: 100%;
-    background: linear-gradient(90deg, #16a34a 0%, #ca8a04 75%, #dc2626 100%);
-    transition: width 0.4s ease;
+    background: var(--accent);
+    width: 0%;
 }
 
 .toolbar-stat {
-    background: var(--stat-bg);
-    padding: 4px 14px;
-    border: 1px solid var(--card-border);
-    text-align: center;
+    text-align: right;
+    padding: 0 6px;
+    border-left: 1px solid var(--border);
 }
 
 .t-label {
+    font-size: 9px;
+    color: var(--text-dim);
     display: block;
-    font-size: 0.5rem;
-    opacity: 0.7;
-    letter-spacing: 1px;
 }
 
 .t-val {
-    font-size: 0.8rem;
-    font-weight: bold;
+    font-weight: 600;
+    font-size: 11px;
 }
 
 .band-matrix {
     display: flex;
-    gap: 6px;
+    gap: 4px;
+    border-top: 1px solid var(--border);
+    padding-top: 6px;
 }
 
 .band-btn {
     flex: 1;
-    background: transparent;
-    border: 1px solid var(--card-border);
-    color: var(--button-text);
-    padding: 6px 0;
-    font-family: 'Roboto', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Open Sans', 'Helvetica Neue', sans-serif;
-    font-size: 0.75rem;
-    font-weight: bold;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 4px 0;
+    font-family: inherit;
+    font-size: 11px;
     cursor: pointer;
-    letter-spacing: 1px;
-    transition: all 0.1s ease;
 }
 
 .band-btn.active, .band-btn:hover {
-    border-color: var(--accent-glow);
-    color: var(--accent-glow);
-    background: var(--stat-bg);
+    border-color: var(--text);
+    color: var(--text);
 }
 
 #workspace {
-    display: grid;
-    grid-template-columns: 380px 1fr;
-    flex-grow: 1;
-    height: calc(100vh - 140px);
-    position: relative;
-    overflow: hidden;
+    position: absolute;
+    top: 170px;
+    left: 12px;
+    width: 340px;
+    max-height: calc(100vh - 190px);
+    z-index: 10;
+    pointer-events: none;
 }
 
 #sidebar {
-    background: var(--sidebar-bg);
-    border-right: 1px solid var(--border-color);
+    pointer-events: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
     display: flex;
     flex-direction: column;
-    overflow-y: auto;
+    max-height: calc(100vh - 190px);
 }
 
 .sidebar-sec-title {
-    background: var(--toolbar-bg);
-    padding: 10px 14px;
-    font-size: 0.7rem;
-    letter-spacing: 2px;
-    border-bottom: 1px solid var(--card-border);
-    font-weight: bold;
+    background: var(--bg);
+    color: var(--text-dim);
+    padding: 6px 10px;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
 }
 
 #spots-list {
-    padding: 12px;
-    flex-grow: 1;
+    padding: 6px;
     overflow-y: auto;
 }
 
 .spot-card {
-    background: var(--card-bg);
-    padding: 10px;
-    margin-bottom: 8px;
-    font-size: 0.75rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--accent);
+    padding: 6px;
+    margin-bottom: 4px;
+    font-size: 11px;
 }
 
 .spot-header {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 4px;
-    font-size: 0.65rem;
-    opacity: 0.8;
+    color: var(--text-dim);
+    margin-bottom: 2px;
+    font-size: 10px;
 }
 
 .spot-route {
-    font-weight: bold;
-    font-size: 0.8rem;
-    letter-spacing: 1px;
+    font-weight: 600;
+    color: var(--text);
 }
 
-#map {
-    width: 100%;
-    height: 100%;
-    background: var(--lcd-bg);
-    z-index: 1;
+input#callsign-filter {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 2px 4px;
+    font-family: inherit;
+    font-size: 11px;
+    width: 75px;
+    text-transform: uppercase;
+}
+
+input#callsign-filter:focus {
+    outline: none;
+    border-color: var(--accent);
 }
 
 @media (max-width: 768px) {
     #workspace {
-        grid-template-columns: 1fr;
-        grid-template-rows: 200px 1fr;
+        width: calc(100vw - 24px);
+        top: 210px;
+        max-height: 220px;
+    }
+    #sidebar {
+        max-height: 220px;
     }
 }
