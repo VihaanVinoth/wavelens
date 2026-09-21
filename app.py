@@ -38,33 +38,18 @@ def maidenhead_to_latlon(locator):
 def index():
     return render_template('index.html')
 
-@app.route('/api/debug')
-def debug_api():
-    band = request.args.get('band', '20m')
-    freq_range = BAND_RANGES.get(band, BAND_RANGES['20m'])
-    target_url = f"https://retrieve.pskreporter.info/query?frange={freq_range[0]}-{freq_range[1]}&flowStartSeconds=-900&rronly=1&rptlimit=50"
-    url = f"https://api.allorigins.win/raw?url={requests.utils.quote(target_url)}"
-    headers = {'User-Agent': 'WaveLens-Telemetry-Console/2.0 (ham-radio-monitoring; contact: dalx900@gmail.com)'}
-    try:
-        res = requests.get(url, headers=headers, timeout=15)
-        return res.text, res.status_code, {'Content-Type': 'text/plain'}
-    except Exception as e:
-        return str(e), 500
-
 @app.route('/api/spots')
 def get_spots():
     band = request.args.get('band', '20m')
     freq_range = BAND_RANGES.get(band, BAND_RANGES['20m'])
     
-    # Define original target URL and route through proxy to bypass cloud IP block
     target_url = f"https://retrieve.pskreporter.info/query?frange={freq_range[0]}-{freq_range[1]}&flowStartSeconds=-900&rronly=1&rptlimit=200"
-    url = f"https://api.allorigins.win/raw?url={requests.utils.quote(target_url)}"
     headers = {'User-Agent': 'WaveLens-Telemetry-Console/2.0 (ham-radio-monitoring; contact: dalx900@gmail.com)'}
     
     spots = []
     try:
-        response = requests.get(url, headers=headers, timeout=15)
-        print(f"[{band}] Proxy HTTP Status: {response.status_code}, Bytes: {len(response.content)}")
+        response = requests.get(target_url, headers=headers, timeout=10)
+        print(f"[{band}] PSK HTTP Status: {response.status_code}, Bytes: {len(response.content)}")
         
         if response.status_code == 200 and len(response.content) > 50:
             root = ET.fromstring(response.content)
@@ -96,7 +81,7 @@ def get_spots():
         print(f"CRITICAL API Error under Gunicorn: {e}")
         
     if not spots:
-        print(f"[{band}] Upstream proxy blocked or empty. Providing telemetry simulation nodes.")
+        print(f"[{band}] Upstream blocked or empty. Providing telemetry simulation nodes.")
         spots = [
             {'sender': 'K3ABC', 'receiver': 'VK3KTT', 'lat1': 38.89, 'lon1': -77.03, 'lat2': -37.81, 'lon2': 144.96, 'frequency': freq_range[0]+1000, 'snr': -12, 'mode': 'FT8'},
             {'sender': 'G4XYZ', 'receiver': 'VK2JAZ', 'lat1': 51.50, 'lon1': -0.12, 'lat2': -33.86, 'lon2': 151.20, 'frequency': freq_range[0]+2500, 'snr': -18, 'mode': 'FT4'},
