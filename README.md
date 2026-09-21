@@ -2,7 +2,7 @@
 
 ![Propagation Map Demo](https://cdn.hackclub.com/01a0c521-91ff-7149-b6e6-1a47022c296d/Screenshot%202026-09-22%20at%204.01.38%E2%80%AFAM.png)
 
-WaveLens is a real-time amateur radio propagation visualiser that uses the public PSKReporter MQTT API, converts Maidenhead grid squares into map coordinates, and plots live radio paths on an interactive Leaflet map. 
+WaveLens is a real-time amateur radio propagation visualiser that uses the public PSK Reporter MQTT API, converts Maidenhead grid squares into map coordinates, and plots live radio paths on an interactive Leaflet map. 
 
 ## How It Was Made
 
