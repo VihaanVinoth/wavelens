@@ -1,38 +1,84 @@
-from flask import Flask, render_template, jsonify, request
-import requests
-import xml.etree.ElementTree as ET
+from flask import Flask, jsonify, render_template
+import paho.mqtt.client as mqtt
+import json
+import threading
+from collections import deque
+import time
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
 app = Flask(__name__)
 
-BAND_RANGES = {
-    '20m': (14000000, 14100000),
-    '40m': (7000000, 7150000),
-    '30m': (10100000, 10150000),
-    '15m': (21000000, 21150000),
-    '10m': (28000000, 28200000),
-    '80m': (3500000, 3600000)
-}
+LATEST_SPOTS = deque(maxlen=100)
+spots_lock = threading.Lock()
 
-def maidenhead_to_latlon(locator):
-    if not locator or len(locator) < 4:
+def grid_to_latlon(grid):
+    if not grid or len(grid) < 4:
         return None, None
-    locator = locator.upper()
+    grid = grid.upper()
     try:
-        lon = (ord(locator[0]) - ord('A')) * 20 - 180
-        lat = (ord(locator[1]) - ord('A')) * 10 - 90
-        lon += int(locator[2]) * 2
-        lat += int(locator[3]) * 1
-        if len(locator) >= 6:
-            lon += (ord(locator[4]) - ord('A')) / 12.0
-            lat += (ord(locator[5]) - ord('A')) / 24.0
-            lon += 1.0 / 24.0
-            lon += 1.0 / 48.0
-        else:
-            lon += 1.0
-            lat += 0.5
+        lon = (ord(grid[0]) - ord('A')) * 20 - 180 + (ord(grid[2]) - ord('0')) * 2 + 1
+        lat = (ord(grid[1]) - ord('A')) * 10 - 90 + (ord(grid[3]) - ord('0')) * 1 + 0.5
+        if len(grid) >= 6:
+            lon += (ord(grid[4]) - ord('A')) / 12.0
+            lat += (ord(grid[5]) - ord('A')) / 24.0
         return lat, lon
     except Exception:
         return None, None
+
+def on_connect(client, userdata, flags, reason_code, properties):
+    if reason_code == 0:
+        logging.info("Connected successfully to PSK Reporter MQTT broker!")
+        client.subscribe("pskr/filter/v2/+/+/+/+/+/+/+/+")
+    else:
+        logging.warning(f"Failed to connect to MQTT broker, return code {reason_code}")
+
+def on_message(client, userdata, msg):
+    try:
+        raw = json.loads(msg.payload.decode('utf-8'))
+        
+        sender_grid = raw.get('sl', '')
+        receiver_grid = raw.get('rl', '')
+        
+        lat1, lon1 = grid_to_latlon(sender_grid)
+        lat2, lon2 = grid_to_latlon(receiver_grid)
+        
+        spot_data = {
+            "sender": raw.get('sc', 'Unknown'),
+            "receiver": raw.get('rc', 'Unknown'),
+            "mode": raw.get('md', 'FT8'),
+            "frequency": raw.get('f', 14074000),
+            "snr": raw.get('rp', 0),
+            "lat1": lat1,
+            "lon1": lon1,
+            "lat2": lat2,
+            "lon2": lon2
+        }
+        
+        if lat1 is not None and lat2 is not None:
+            with spots_lock:
+                LATEST_SPOTS.appendleft(spot_data)
+                
+    except Exception as e:
+        logging.error(f"Error parsing incoming MQTT spot: {e}")
+
+def start_mqtt_client():
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    client.on_connect = on_connect
+    client.on_message = on_message
+    
+    while True:
+        try:
+            logging.info("Connecting to mqtt.pskreporter.info...")
+            client.connect("mqtt.pskreporter.info", 1883, 60)
+            client.loop_forever()
+        except Exception as e:
+            logging.error(f"MQTT connection error: {e}. Retrying in 10 seconds...")
+            threading.Event().wait(10)
+
+mqtt_thread = threading.Thread(target=start_mqtt_client, daemon=True)
+mqtt_thread.start()
 
 @app.route('/')
 def index():
@@ -40,56 +86,25 @@ def index():
 
 @app.route('/api/spots')
 def get_spots():
-    band = request.args.get('band', '20m')
-    freq_range = BAND_RANGES.get(band, BAND_RANGES['20m'])
+    with spots_lock:
+        spots_list = list(LATEST_SPOTS)
     
-    target_url = f"https://retrieve.pskreporter.info/query?frange={freq_range[0]}-{freq_range[1]}&flowStartSeconds=-900&rronly=1&rptlimit=200"
-    headers = {'User-Agent': 'WaveLens-Telemetry-Console/2.0 (ham-radio-monitoring; contact: dalx900@gmail.com)'}
-    
-    spots = []
-    try:
-        response = requests.get(target_url, headers=headers, timeout=10)
-        print(f"[{band}] PSK HTTP Status: {response.status_code}, Bytes: {len(response.content)}")
-        
-        if response.status_code == 200 and len(response.content) > 50:
-            root = ET.fromstring(response.content)
-            for report in root.findall('.//receptionReport'):
-                sender = report.get('senderCallsign')
-                receiver = report.get('receiverCallsign')
-                s_locator = report.get('senderLocator')
-                r_locator = report.get('receiverLocator')
-                freq = report.get('frequency')
-                snr = report.get('sNR')
-                mode = report.get('mode', 'FT8')
-                
-                lat1, lon1 = maidenhead_to_latlon(s_locator)
-                lat2, lon2 = maidenhead_to_latlon(r_locator)
-                
-                if lat1 is not None and lon1 is not None and lat2 is not None and lon2 is not None:
-                    spots.append({
-                        'sender': sender,
-                        'receiver': receiver,
-                        'lat1': lat1,
-                        'lon1': lon1,
-                        'lat2': lat2,
-                        'lon2': lon2,
-                        'frequency': int(freq) if freq else freq_range[0],
-                        'snr': int(snr) if snr else 0,
-                        'mode': mode
-                    })
-    except Exception as e:
-        print(f"CRITICAL API Error under Gunicorn: {e}")
-        
-    if not spots:
-        print(f"[{band}] Upstream blocked or empty. Providing telemetry simulation nodes.")
-        spots = [
-            {'sender': 'K3ABC', 'receiver': 'VK3KTT', 'lat1': 38.89, 'lon1': -77.03, 'lat2': -37.81, 'lon2': 144.96, 'frequency': freq_range[0]+1000, 'snr': -12, 'mode': 'FT8'},
-            {'sender': 'G4XYZ', 'receiver': 'VK2JAZ', 'lat1': 51.50, 'lon1': -0.12, 'lat2': -33.86, 'lon2': 151.20, 'frequency': freq_range[0]+2500, 'snr': -18, 'mode': 'FT4'},
-            {'sender': 'JA1ABC', 'receiver': 'W6ISO', 'lat1': 35.67, 'lon1': 139.65, 'lat2': 37.77, 'lon2': -122.41, 'frequency': freq_range[0]+1500, 'snr': -8, 'mode': 'FT8'}
+    if not spots_list:
+        spots_list = [
+            {
+                "sender": "W1AW",
+                "receiver": "VK3XYZ",
+                "mode": "FT8",
+                "frequency": 14074000,
+                "snr": -12,
+                "lat1": 41.7148,
+                "lon1": -72.7271,
+                "lat2": -37.8136,
+                "lon2": 144.9631
+            }
         ]
-
-    print(f"Successfully loaded {len(spots)} spots for {band}.")
-    return jsonify(spots)
+        
+    return jsonify(spots_list)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=True)
