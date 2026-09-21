@@ -1,69 +1,80 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WaveLens - Propagation Dashboard</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    <title>WaveLens</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div id="radio-console">
-        <main id="map" aria-label="Propagation Map" role="application"></main>
-        <header id="transceiver-deck" role="region" aria-label="Control Deck">
-            <div class="deck-top-row">
-                <div class="brand-badge">
-                    <span class="power-led active" aria-hidden="true"></span>
-                    <span>WAVELENS</span>
-                    <span class="status-badge">LIVE</span>
+    <div id="map"></div>
+    <aside id="radar-hud">
+        <header class="hud-header">
+            <div class="hud-brand">
+                <div>
+                    <div class="hud-brand-name">WaveLens</div>
                 </div>
-                <div class="lcd-frequency-display" aria-live="polite">
-                    <span class="freq-label">VFO A</span>
-                    <span class="freq-value" id="vfo-freq">14.074.00</span>
+            </div>
+            <button id="theme-toggle" class="map-control-btn" type="button" aria-label="Toggle theme" title="Toggle Theme" style="width: 30px; height: 30px; font-size: 14px; margin-left: auto; margin-right: 8px; border-radius: 7px; border: 1px solid var(--border);">
+                🌓
+            </button>
+            <div class="status">
+                <span id="status-dot" class="status-dot"></span>
+                <span id="connection-status">CONNECTING</span>
+            </div>
+        </header>
+        <section class="hud-frequency-section">
+            <div>
+                <div class="frequency-label">Active Frequency</div>
+                <div class="freq-group">
+                    <span id="freq-display" class="freq-val">14.074</span>
                     <span class="freq-unit">MHz</span>
                 </div>
-                <div class="deck-controls-group">
-                    <button id="theme-toggle" class="control-btn" aria-label="Toggle Theme">Theme</button>
-                    <div class="deck-clock" id="utc-clock" aria-label="UTC Clock">00:00:00</div>
+            </div>
+            <div class="hud-stat-group">
+                <div class="stat-label">Active Spots: <strong id="stat-count">0</strong></div>
+                <div class="meter-track">
+                    <div class="meter-bar" style="width: 65%;"></div>
                 </div>
             </div>
-            <div class="deck-toolbar">
-                <div class="s-meter-container">
-                    <div class="meter-label" id="meter-label-id">AVG SNR SIGNAL METER</div>
-                    <div class="meter-track" role="progressbar" aria-labelledby="meter-label-id" aria-valuemin="-30" aria-valuemax="10" id="s-meter-progress">
-                        <div class="meter-bar" id="s-meter-bar" style="width: 0%;"></div>
-                    </div>
-                </div>
-                <div class="toolbar-stat">
-                    <span class="t-label">SPOTS</span>
-                    <span class="t-val" id="stat-count">0</span>
-                </div>
-                <div class="toolbar-stat">
-                    <span class="t-label">AVG SNR</span>
-                    <span class="t-val" id="stat-snr">0 dB</span>
-                </div>
-                <div class="toolbar-stat" style="display: flex; flex-direction: column; gap: 2px;">
-                    <span class="t-label">FILTER</span>
-                    <input type="text" id="callsign-filter" placeholder="CALL..." />
-                </div>
+        </section>
+        <section class="band-section">
+            <div class="section-label">Bands</div>
+            <div class="band-matrix">
+                <button class="band-btn" data-band="160m" type="button">160M</button>
+                <button class="band-btn" data-band="80m" type="button">80M</button>
+                <button class="band-btn" data-band="40m" type="button">40M</button>
+                <button class="band-btn active" data-band="20m" type="button">20M</button>
+                <button class="band-btn" data-band="15m" type="button">15M</button>
+                <button class="band-btn" data-band="10m" type="button">10M</button>
+                <button class="band-btn" data-band="6m" type="button">6M</button>
+                <button class="band-btn" data-band="2m" type="button">2M</button>
             </div>
-            <nav class="band-matrix" aria-label="Band Selection">
-                <button class="band-btn active" data-band="20m" data-freq="14.074.00">20M</button>
-                <button class="band-btn" data-band="40m" data-freq="7.074.00">40M</button>
-                <button class="band-btn" data-band="30m" data-freq="10.136.00">30M</button>
-                <button class="band-btn" data-band="15m" data-freq="21.074.00">15M</button>
-                <button class="band-btn" data-band="10m" data-freq="28.180.00">10M</button>
-                <button class="band-btn" data-band="80m" data-freq="3.573.00">80M</button>
-            </nav>
-        </header>
-        <div id="workspace">
-            <aside id="sidebar" aria-label="Live Telemetry Sidebar">
-                <div class="sidebar-sec-title">Telemetry Feed</div>
-                <div id="spots-list" tabindex="0">Connecting to telemetry stream...</div>
-            </aside>
+        </section>
+        <div class="spots-toolbar">
+            <span class="spots-title">Live Feed</span>
+            <time id="utc-clock">00:00:00 UTC</time>
         </div>
+        <div class="search-wrapper">
+            <input id="callsign-filter" type="text" placeholder="Filter by callsign, mode, freq..." autocomplete="off">
+        </div>
+        <div id="spots-list"></div>
+    </aside>
+    <div class="map-controls">
+        <button id="zoom-in" class="map-control-btn" type="button" aria-label="Zoom in">+</button>
+        <button id="zoom-out" class="map-control-btn" type="button" aria-label="Zoom out">-</button>
     </div>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script>
+        window.WAVELENS_CONFIG = {
+            hub: {
+                lat: -38.21,
+                lon: 145.11,
+                callsign: "LOCAL"
+            }
+        };
+    </script>
+    <script src="static/js/app.js"></script>
 </body>
 </html>
