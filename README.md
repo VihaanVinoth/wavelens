@@ -17,7 +17,8 @@ Some of the hurdles tackled during development:
 
 `
 git clone https://github.com/VihaanVinoth/wavelens.git
-cd propagation-map
+
+cd wavelens
 `
 
 2. Install the project's dependencies:
