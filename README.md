@@ -17,6 +17,7 @@ Some of the hurdles tackled during development:
 
 `
 git clone https://github.com/VihaanVinoth/wavelens.git
+<br>
 cd wavelens
 `
 
