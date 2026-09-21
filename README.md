@@ -16,7 +16,7 @@ Some of the hurdles tackled during development:
 1. Clone the source code to your device:
 
 `
-git clone https://github.com/yourusername/propagation-map.git
+git clone https://github.com/VihaanVinoth/wavelens.git
 cd propagation-map
 `
 
