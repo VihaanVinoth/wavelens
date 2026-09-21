@@ -1,69 +1,69 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WaveLens</title>
+    <title>WaveLens - Amateur Radio Telemetry Console</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div id="radio-console">
-        <header id="transceiver-deck" role="region" aria-label="Transceiver Control Deck">
-            <div class="deck-top-row">
-                <div class="brand-badge">
-                    <span class="power-led active" aria-hidden="true"></span>
-                    <span class="rig-name">WAVELENS</span>
-                    <span class="status-badge">ONLINE</span>
-                </div>
-                <div class="lcd-frequency-display" aria-live="polite">
-                    <span class="freq-label">VFO A / REAL FREQ</span>
-                    <span class="freq-value" id="vfo-freq">14.074.00</span>
-                    <span class="freq-unit">MHz</span>
-                </div>
-                <div class="deck-controls-group">
-                    <button id="theme-toggle" class="control-btn" aria-label="Toggle Light and Dark Mode">Dark</button>
-                    <div class="deck-clock" id="utc-clock" aria-label="Current UTC Time">00:00:00 UTC</div>
-                </div>
-            </div>
-            <div class="deck-toolbar">
-                <div class="s-meter-container">
-                    <div class="meter-label" id="meter-label-id">S-METER / SNR</div>
-                    <div class="meter-track" role="progressbar" aria-labelledby="meter-label-id" aria-valuemin="-30" aria-valuemax="10" id="s-meter-progress">
-                        <div class="meter-bar" id="s-meter-bar" style="width: 45%;"></div>
-                    </div>
-                </div>
-                <div class="toolbar-stat">
-                    <span class="t-label">SPOTS</span>
-                    <span class="t-val" id="stat-count">0</span>
-                </div>
-                <div class="toolbar-stat">
-                    <span class="t-label">AVG SNR</span>
-                    <span class="t-val" id="stat-snr">0 dB</span>
-                </div>
-                <div class="toolbar-stat" style="display: flex; flex-direction: column; justify-content: center;">
-                    <span class="t-label">FILTER CALL</span>
-                    <input type="text" id="callsign-filter" placeholder="e.g. VK3..." style="background: var(--stat-bg); border: 1px solid var(--card-border); color: var(--text-color); padding: 2px 4px; border-radius: 2px; font-size: 0.75rem; width: 80px; text-transform: uppercase;" />
-                </div>
-            </div>
-            <nav class="band-matrix" aria-label="Band Selection Matrix">
-                <button class="band-btn active" data-band="20m" data-freq="14.074.00">20m</button>
-                <button class="band-btn" data-band="40m" data-freq="7.074.00">40m</button>
-                <button class="band-btn" data-band="30m" data-freq="10.136.00">30m</button>
-                <button class="band-btn" data-band="15m" data-freq="21.074.00">15m</button>
-                <button class="band-btn" data-band="10m" data-freq="28.180.00">10m</button>
-                <button class="band-btn" data-band="80m" data-freq="3.573.00">80m</button>
-            </nav>
-        </header>
-        <div id="workspace">
-            <aside id="sidebar" aria-label="Live Telemetry Sidebar">
-                <div class="sidebar-sec-title">LIVE TELEMETRY STREAM</div>
-                <div id="spots-list" tabindex="0">Acquiring ionospheric telemetry feed...</div>
-            </aside>
-            <main id="map" aria-label="Interactive Propagation Map" role="application"></main>
+    <header>
+        <h1>WaveLens Telemetry Console</h1>
+        <div class="controls">
+            <select id="band-select" onchange="loadSpots()">
+                <option value="20m">20m Band</option>
+                <option value="40m">40m Band</option>
+                <option value="30m">30m Band</option>
+                <option value="15m">15m Band</option>
+                <option value="10m">10m Band</option>
+                <option value="80m">80m Band</option>
+            </select>
+            <div id="status-badge" class="badge">Loading spots...</div>
         </div>
-    </div>
+    </header>
+
+    <main>
+        <div id="map"></div>
+    </main>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script>
+        const map = L.map('map').setView([20, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        let linesLayer = L.layerGroup().addTo(map);
+
+        function loadSpots() {
+            const band = document.getElementById('band-select').value;
+            document.getElementById('status-badge').innerText = `Fetching ${band}...`;
+            
+            fetch(`/api/spots?band=${band}`)
+                .then(res => res.json())
+                .then(spots => {
+                    linesLayer.clearLayers();
+                    document.getElementById('status-badge').innerText = `Loaded ${spots.length} spots (${band})`;
+                    
+                    spots.forEach(spot => {
+                        const latlngs = [
+                            [spot.lat1, spot.lon1],
+                            [spot.lat2, spot.lon2]
+                        ];
+                        const polyline = L.polyline(latlngs, {color: '#00ffcc', weight: 1, opacity: 0.6});
+                        polyline.bindPopup(`<b>${spot.sender}</b> → <b>${spot.receiver}</b><br>SNR: ${spot.snr} dB<br>Mode: ${spot.mode}`);
+                        linesLayer.addLayer(polyline);
+                    });
+                })
+                .catch(err => {
+                    console.error("Error loading spots:", err);
+                    document.getElementById('status-badge').innerText = 'Error loading feed';
+                });
+        }
+
+        loadSpots();
+        setInterval(loadSpots, 60000);
+    </script>
 </body>
 </html>
