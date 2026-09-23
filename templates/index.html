@@ -4,77 +4,138 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WaveLens</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div id="map"></div>
-    <aside id="radar-hud">
-        <header class="hud-header">
-            <div class="hud-brand">
-                <div>
-                    <div class="hud-brand-name">WaveLens</div>
-                </div>
+    <header class="topbar">
+        <div class="identity">
+            <div class="logo">
+                <img src="https://cdn.hackclub.com/01a0cdab-0253-755d-ae0f-8c966ce69e41/Wavelens-logo.png">
             </div>
-            <button id="theme-toggle" class="map-control-btn" type="button" aria-label="Toggle theme" title="Toggle Theme" style="width: 30px; height: 30px; font-size: 14px; margin-left: auto; margin-right: 8px; border-radius: 7px; border: 1px solid var(--border);">
-                🌓
-            </button>
-            <div class="status">
-                <span id="status-dot" class="status-dot"></span>
+            <div>
+                <div class="name">WaveLens</div>
+                <div class="descriptor">RADIO PROPAGATION MONITOR</div>
+            </div>
+        </div>
+
+        <div class="topbar-right">
+
+            <div class="utc">
+                <span id="utc-clock">00:00:00</span>
+                <span>UTC</span>
+            </div>
+            <div class="connection">
+                <span id="status-dot"></span>
                 <span id="connection-status">CONNECTING</span>
             </div>
-        </header>
-        <section class="hud-frequency-section">
-            <div>
-                <div class="frequency-label">Active Frequency</div>
-                <div class="freq-group">
-                    <span id="freq-display" class="freq-val">14.074</span>
-                    <span class="freq-unit">MHz</span>
+            <button id="theme-toggle" class="plain-button" type="button">
+                THEME
+            </button>
+        </div>
+    </header>
+    <aside class="console">
+        <section class="frequency">
+            <div class="label">
+                FREQUENCY
+            </div>
+            <div class="frequency-value">
+                <span id="freq-display">14.074</span>
+                <span>MHz</span>
+            </div>
+            <div class="frequency-meta">
+                <span>
+                    ACTIVE BAND
+                </span>
+                <strong id="active-band">
+                    20M
+                </strong>
+            </div>
+        </section>
+        <section class="bands">
+            <div class="section-head">
+                <span>BANDS</span>
+                <button id="all-bands" type="button">
+                    ALL
+                </button>
+            </div>
+            <div class="band-list">
+                <button class="band-btn" data-band="160m">160M</button>
+                <button class="band-btn" data-band="80m">80M</button>
+                <button class="band-btn" data-band="40m">40M</button>
+                <button class="band-btn active" data-band="20m">20M</button>
+                <button class="band-btn" data-band="15m">15M</button>
+                <button class="band-btn" data-band="10m">10M</button>
+                <button class="band-btn" data-band="6m">6M</button>
+                <button class="band-btn" data-band="2m">2M</button>
+            </div>
+        </section>
+        <section class="activity">
+            <div class="section-head">
+                <span>ACTIVITY</span>
+                <span id="stat-count">0</span>
+            </div>
+            <div class="activity-line">
+                <div id="activity-meter"></div>
+            </div>
+        </section>
+        <section class="feed">
+            <div class="feed-head">
+                <div>
+                    <span class="section-title">REPORTS</span>
+                    <span id="feed-state">LIVE</span>
+                </div>
+                <div class="feed-controls">
+                    <button id="pause-btn" type="button">
+                        PAUSE
+                    </button>
+                    <button id="clear-btn" type="button">
+                        CLEAR
+                    </button>
+                    <button id="export-csv-btn" type="button">
+                        CSV
+                    </button>
                 </div>
             </div>
-            <div class="hud-stat-group">
-                <div class="stat-label">Active Spots: <strong id="stat-count">0</strong></div>
-                <div class="meter-track">
-                    <div class="meter-bar" style="width: 65%;"></div>
+            <input id="callsign-filter" type="search" placeholder="Filter reports..." autocomplete="off">
+            <div id="spots-list">
+                <div class="empty-state">
+                    <div>NO REPORTS</div>
+                    <span>Waiting for propagation data</span>
                 </div>
             </div>
         </section>
-        <section class="band-section">
-            <div class="section-label">Bands</div>
-            <div class="band-matrix">
-                <button class="band-btn" data-band="160m" type="button">160M</button>
-                <button class="band-btn" data-band="80m" type="button">80M</button>
-                <button class="band-btn" data-band="40m" type="button">40M</button>
-                <button class="band-btn active" data-band="20m" type="button">20M</button>
-                <button class="band-btn" data-band="15m" type="button">15M</button>
-                <button class="band-btn" data-band="10m" type="button">10M</button>
-                <button class="band-btn" data-band="6m" type="button">6M</button>
-                <button class="band-btn" data-band="2m" type="button">2M</button>
-            </div>
-        </section>
-        <div class="spots-toolbar">
-            <span class="spots-title">Live Feed</span>
-            <time id="utc-clock">00:00:00 UTC</time>
-        </div>
-        <div class="search-wrapper">
-            <input id="callsign-filter" type="text" placeholder="Filter by callsign, mode, freq..." autocomplete="off">
-        </div>
-        <div id="spots-list"></div>
+        <footer>
+            <span>
+                WAVELENS
+            </span>
+            <span id="last-update">
+                —
+            </span>
+        </footer>
     </aside>
     <div class="map-controls">
-        <button id="zoom-in" class="map-control-btn" type="button" aria-label="Zoom in">+</button>
-        <button id="zoom-out" class="map-control-btn" type="button" aria-label="Zoom out">-</button>
+        <button id="zoom-in" type="button">
+            +
+        </button>
+        <button id="zoom-out" type="button">
+            −
+        </button>
     </div>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script>
         window.WAVELENS_CONFIG = {
             hub: {
-                lat: -38.21,
-                lon: 145.11,
-                callsign: "LOCAL"
+                lat: {{ hub.lat | tojson }},
+                lon: { { hub.lon | tojson } },
+                callsign: { { hub.callsign | tojson } }
             }
         };
     </script>
-    <script src="static/js/app.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>

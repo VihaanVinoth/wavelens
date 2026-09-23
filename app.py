@@ -6,8 +6,8 @@ import logging
 import os
 import threading
 import time
-
 from collections import deque
+
 
 HOST = "0.0.0.0"
 PORT = int(os.getenv("PORT", "5001"))
@@ -15,20 +15,23 @@ PORT = int(os.getenv("PORT", "5001"))
 MQTT_HOST = "mqtt.pskreporter.info"
 MQTT_PORT = 1883
 
-HUB_CALLSIGN = os.getenv(
-    "WAVELENS_CALLSIGN",
-    "WB2QEF"
-)
+HUB_CALLSIGN = os.getenv("WAVELENS_CALLSIGN", "WB2QEF")
+HUB_LAT = float(os.getenv("WAVELENS_LAT", "40.7128"))
+HUB_LON = float(os.getenv("WAVELENS_LON", "-74.0060"))
 
-HUB_LAT = float(
-    os.getenv("WAVELENS_LAT", "40.7128")
-)
+SPOTS_PER_BAND = 75
 
-HUB_LON = float(
-    os.getenv("WAVELENS_LON", "-74.0060")
-)
+BANDS = {
+    "160m": (1.8, 2.0),
+    "80m": (3.5, 4.0),
+    "40m": (7.0, 7.3),
+    "20m": (14.0, 14.35),
+    "15m": (21.0, 21.45),
+    "10m": (28.0, 29.7),
+    "6m": (50.0, 54.0),
+    "2m": (144.0, 148.0)
+}
 
-MAX_SPOTS = 150
 
 logging.basicConfig(
     level=logging.INFO,
@@ -40,12 +43,28 @@ logger = logging.getLogger("wavelens")
 app = Flask(__name__)
 
 
-LATEST_SPOTS = deque(maxlen=MAX_SPOTS)
+BAND_SPOTS = {
+    band: deque(maxlen=SPOTS_PER_BAND)
+    for band in BANDS
+}
 
 spots_lock = threading.Lock()
 
-def grid_to_latlon(grid):
 
+def get_band(frequency):
+    try:
+        mhz = float(frequency) / 1_000_000
+    except (TypeError, ValueError):
+        return None
+
+    for band, (low, high) in BANDS.items():
+        if low <= mhz <= high:
+            return band
+
+    return None
+
+
+def grid_to_latlon(grid):
     if not grid:
         return None, None
 
@@ -71,13 +90,11 @@ def grid_to_latlon(grid):
 
         if len(grid) >= 6:
             lon += (
-                (ord(grid[4]) - ord("A"))
-                + 0.5
+                (ord(grid[4]) - ord("A")) + 0.5
             ) / 12.0
 
             lat += (
-                (ord(grid[5]) - ord("A"))
-                + 0.5
+                (ord(grid[5]) - ord("A")) + 0.5
             ) / 24.0
 
         return lat, lon
@@ -85,14 +102,8 @@ def grid_to_latlon(grid):
     except (TypeError, ValueError, IndexError):
         return None, None
 
-def on_connect(
-    client,
-    userdata,
-    flags,
-    reason_code,
-    properties=None
-):
 
+def on_connect(client, userdata, flags, reason_code, properties=None):
     code = (
         reason_code.value
         if hasattr(reason_code, "value")
@@ -104,8 +115,10 @@ def on_connect(
             "Connected to PSK Reporter MQTT broker."
         )
 
-        client.subscribe(
-            "pskr/filter/v2/+/+/+/+/+/+/+/+"
+        client.subscribe("pskr/filter/v2/#")
+
+        logger.info(
+            "Subscribed to the full PSK Reporter MQTT feed."
         )
 
     else:
@@ -116,7 +129,6 @@ def on_connect(
 
 
 def on_message(client, userdata, msg):
-
     try:
         raw = json.loads(
             msg.payload.decode("utf-8")
@@ -125,52 +137,61 @@ def on_message(client, userdata, msg):
         sender_grid = raw.get("sl", "")
         receiver_grid = raw.get("rl", "")
 
-        lat1, lon1 = grid_to_latlon(
+        sender_lat, sender_lon = grid_to_latlon(
             sender_grid
         )
 
-        lat2, lon2 = grid_to_latlon(
+        receiver_lat, receiver_lon = grid_to_latlon(
             receiver_grid
         )
 
-        if lat1 is None or lat2 is None:
+        if (
+            sender_lat is None
+            and receiver_lat is None
+        ):
             return
 
+        frequency = raw.get("f", 0)
+
+        try:
+            frequency = int(frequency)
+        except (TypeError, ValueError):
+            frequency = 0
+
+        band = get_band(frequency)
+
+        if band is None:
+            return
+
+        snr = raw.get("rp", 0)
+
+        try:
+            snr = float(snr)
+        except (TypeError, ValueError):
+            snr = 0
+
         spot = {
-            "sender": raw.get(
-                "sc",
-                "Unknown"
-            ),
+            "sender": raw.get("sc") or "Unknown",
+            "receiver": raw.get("rc") or "Unknown",
+            "mode": raw.get("md") or "Unknown",
 
-            "receiver": raw.get(
-                "rc",
-                "Unknown"
-            ),
+            "frequency": frequency,
+            "snr": snr,
 
-            "mode": raw.get(
-                "md",
-                "FT8"
-            ),
+            "sender_grid": sender_grid,
+            "receiver_grid": receiver_grid,
 
-            "frequency": raw.get(
-                "f",
-                14074000
-            ),
+            "lat1": sender_lat,
+            "lon1": sender_lon,
 
-            "snr": raw.get(
-                "rp",
-                0
-            ),
+            "lat2": receiver_lat,
+            "lon2": receiver_lon,
 
-            "lat1": lat1,
-            "lon1": lon1,
-
-            "lat2": lat2,
-            "lon2": lon2
+            "timestamp": time.time()
         }
 
         with spots_lock:
-            LATEST_SPOTS.appendleft(spot)
+            BAND_SPOTS[band].appendleft(spot)
 
     except json.JSONDecodeError:
         logger.warning(
@@ -184,12 +205,7 @@ def on_message(client, userdata, msg):
 
 
 def start_mqtt_client():
-    """
-    Keep the MQTT connection alive.
-    """
-
     while True:
-
         client = mqtt.Client(
             mqtt.CallbackAPIVersion.VERSION2
         )
@@ -198,7 +214,6 @@ def start_mqtt_client():
         client.on_message = on_message
 
         try:
-
             logger.info(
                 "Connecting to %s:%s...",
                 MQTT_HOST,
@@ -214,7 +229,6 @@ def start_mqtt_client():
             client.loop_forever()
 
         except Exception as error:
-
             logger.error(
                 "MQTT connection error: %s",
                 error
@@ -226,6 +240,7 @@ def start_mqtt_client():
 
             time.sleep(10)
 
+
 mqtt_thread = threading.Thread(
     target=start_mqtt_client,
     name="wavelens-mqtt",
@@ -234,9 +249,9 @@ mqtt_thread = threading.Thread(
 
 mqtt_thread.start()
 
+
 @app.route("/")
 def index():
-
     return render_template(
         "index.html",
         hub={
@@ -249,47 +264,76 @@ def index():
 
 @app.route("/api/spots")
 def get_spots():
-
     with spots_lock:
-        spots = list(LATEST_SPOTS)
+        spots = []
 
-    if not spots:
+        for band_spots in BAND_SPOTS.values():
+            spots.extend(band_spots)
 
-        spots = [
-            {
-                "sender": "W1AW",
-                "receiver": "VK3XYZ",
-                "mode": "FT8",
-                "frequency": 14074000,
-                "snr": -12,
-
-                "lat1": 41.7148,
-                "lon1": -72.7271,
-
-                "lat2": -37.8136,
-                "lon2": 144.9631
-            }
-        ]
+    spots.sort(
+        key=lambda spot: spot["timestamp"],
+        reverse=True
+    )
 
     return jsonify(spots)
 
-@app.route("/api/health")
-def health():
+
+@app.route("/api/spots/<band>")
+def get_band_spots(band):
+    band = band.lower()
+
+    if band not in BAND_SPOTS:
+        return jsonify({
+            "error": "Unknown band"
+        }), 404
 
     with spots_lock:
-        count = len(LATEST_SPOTS)
+        spots = list(BAND_SPOTS[band])
+
+    return jsonify(spots)
+
+
+@app.route("/api/stats")
+def get_stats():
+    with spots_lock:
+        stats = {
+            band: len(spots)
+            for band, spots in BAND_SPOTS.items()
+        }
+
+    return jsonify(stats)
+
+
+@app.route("/api/health")
+def health():
+    with spots_lock:
+        total = sum(
+            len(spots)
+            for spots in BAND_SPOTS.values()
+        )
+
+        stats = {
+            band: len(spots)
+            for band, spots in BAND_SPOTS.items()
+        }
 
     return jsonify({
         "status": "ok",
-        "spots": count,
+        "spots": total,
+        "bands": stats,
         "mqtt": MQTT_HOST
     })
 
+
 if __name__ == "__main__":
+    logger.info(
+        "Starting WaveLens on port %s",
+        PORT
+    )
 
     app.run(
         host=HOST,
         port=PORT,
-        debug=True,
+        debug=False,
         use_reloader=False
     )
