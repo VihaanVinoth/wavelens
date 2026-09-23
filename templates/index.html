@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,121 +12,151 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div id="map"></div>
-    <header class="topbar">
-        <div class="identity">
-            <div class="logo">
-                <img src="https://cdn.hackclub.com/01a0cdab-0253-755d-ae0f-8c966ce69e41/Wavelens-logo.png">
+    <main id="map-app" class="map-app">
+        <div id="map"></div>
+        <header class="topbar">
+            <div class="identity">
+                <div class="logo">
+                    <img src="https://cdn.hackclub.com/01a0cdab-0253-755d-ae0f-8c966ce69e41/Wavelens-logo.png"
+                        alt="WaveLens">
+                </div>
+                <div>
+                    <div class="name">WaveLens</div>
+                </div>
             </div>
-            <div>
-                <div class="name">WaveLens</div>
-                <div class="descriptor">RADIO PROPAGATION MONITOR</div>
-            </div>
-        </div>
-
-        <div class="topbar-right">
-
-            <div class="utc">
-                <span id="utc-clock">00:00:00</span>
-                <span>UTC</span>
-            </div>
-            <div class="connection">
-                <span id="status-dot"></span>
-                <span id="connection-status">CONNECTING</span>
-            </div>
-            <button id="theme-toggle" class="plain-button" type="button">
-                THEME
-            </button>
-        </div>
-    </header>
-    <aside class="console">
-        <section class="frequency">
-            <div class="label">
-                FREQUENCY
-            </div>
-            <div class="frequency-value">
-                <span id="freq-display">14.074</span>
-                <span>MHz</span>
-            </div>
-            <div class="frequency-meta">
-                <span>
-                    ACTIVE BAND
-                </span>
-                <strong id="active-band">
-                    20M
-                </strong>
-            </div>
-        </section>
-        <section class="bands">
-            <div class="section-head">
-                <span>BANDS</span>
-                <button id="all-bands" type="button">
-                    ALL
+            <div class="topbar-right">
+                <button id="back-home" class="plain-button" type="button">Home</button>
+                <div class="utc">
+                    <span id="utc-clock">
+                        00:00:00
+                    </span>
+                    <span>UTC</span>
+                </div>
+                <div class="connection">
+                    <span id="status-dot"></span>
+                    <span id="connection-status">
+                        CONNECTING
+                    </span>
+                </div>
+                <button id="theme-toggle" class="plain-button" type="button">
+                    THEME
                 </button>
             </div>
-            <div class="band-list">
-                <button class="band-btn" data-band="160m">160M</button>
-                <button class="band-btn" data-band="80m">80M</button>
-                <button class="band-btn" data-band="40m">40M</button>
-                <button class="band-btn active" data-band="20m">20M</button>
-                <button class="band-btn" data-band="15m">15M</button>
-                <button class="band-btn" data-band="10m">10M</button>
-                <button class="band-btn" data-band="6m">6M</button>
-                <button class="band-btn" data-band="2m">2M</button>
-            </div>
-        </section>
-        <section class="activity">
-            <div class="section-head">
-                <span>ACTIVITY</span>
-                <span id="stat-count">0</span>
-            </div>
-            <div class="activity-line">
-                <div id="activity-meter"></div>
-            </div>
-        </section>
-        <section class="feed">
-            <div class="feed-head">
-                <div>
-                    <span class="section-title">REPORTS</span>
-                    <span id="feed-state">LIVE</span>
+        </header>
+        <aside class="console">
+            <section class="frequency">
+                <div class="label">
+                    FREQUENCY
                 </div>
-                <div class="feed-controls">
-                    <button id="pause-btn" type="button">
-                        PAUSE
-                    </button>
-                    <button id="clear-btn" type="button">
-                        CLEAR
-                    </button>
-                    <button id="export-csv-btn" type="button">
-                        CSV
+                <div class="frequency-value">
+                    <span id="freq-display">
+                        14.074
+                    </span>
+                    <span>MHz</span>
+                </div>
+                <div class="frequency-meta">
+                    <span>
+                        ACTIVE BAND
+                    </span>
+                    <strong id="active-band">
+                        20M
+                    </strong>
+                </div>
+            </section>
+            <section class="bands">
+                <div class="section-head">
+                    <span>BANDS</span>
+                    <button id="all-bands" type="button">
+                        ALL
                     </button>
                 </div>
-            </div>
-            <input id="callsign-filter" type="search" placeholder="Filter reports..." autocomplete="off">
-            <div id="spots-list">
-                <div class="empty-state">
-                    <div>NO REPORTS</div>
-                    <span>Waiting for propagation data</span>
+                <div class="band-list">
+                    <button class="band-btn" data-band="160m">
+                        160M
+                    </button>
+                    <button class="band-btn" data-band="80m">
+                        80M
+                    </button>
+                    <button class="band-btn" data-band="40m">
+                        40M
+                    </button>
+                    <button class="band-btn active" data-band="20m">
+                        20M
+                    </button>
+                    <button class="band-btn" data-band="15m">
+                        15M
+                    </button>
+                    <button class="band-btn" data-band="10m">
+                        10M
+                    </button>
+                    <button class="band-btn" data-band="6m">
+                        6M
+                    </button>
+                    <button class="band-btn" data-band="2m">
+                        2M
+                    </button>
                 </div>
-            </div>
-        </section>
-        <footer>
-            <span>
-                WAVELENS
-            </span>
-            <span id="last-update">
-                —
-            </span>
-        </footer>
-    </aside>
-    <div class="map-controls">
-        <button id="zoom-in" type="button">
-            +
-        </button>
-        <button id="zoom-out" type="button">
-            −
-        </button>
-    </div>
+            </section>
+            <section class="activity">
+                <div class="section-head">
+                    <span>ACTIVITY</span>
+                    <span id="stat-count">
+                        0
+                    </span>
+                </div>
+                <div class="activity-line">
+                    <div id="activity-meter"></div>
+                </div>
+            </section>
+            <section class="feed">
+                <div class="feed-head">
+                    <div>
+                        <span class="section-title">
+                            REPORTS
+                        </span>
+                        <span id="feed-state">
+                            SNAPSHOT
+                        </span>
+                    </div>
+                    <div class="feed-controls">
+                        <button id="update-btn" type="button">
+                            UPDATE
+                        </button>
+                        <button id="clear-btn" type="button">
+                            CLEAR
+                        </button>
+                        <button id="export-csv-btn" type="button">
+                            CSV
+                        </button>
+                    </div>
+                </div>
+                <input id="callsign-filter" type="search" placeholder="Filter reports..." autocomplete="off">
+                <div id="spots-list">
+                    <div class="empty-state">
+                        <div>
+                            NO REPORTS
+                        </div>
+                        <span>
+                            Loading propagation snapshot
+                        </span>
+                    </div>
+                </div>
+            </section>
+            <footer>
+                <span id="last-update">
+                    —
+                </span>
+            </footer>
+        </aside>
+        <div class="map-controls">
+            <button id="zoom-in" type="button">
+                +
+            </button>
+            <button id="zoom-out" type="button">
+                −
+            </button>
+        </div>
+    </main>
     <script>
         window.WAVELENS_CONFIG = {
             hub: {

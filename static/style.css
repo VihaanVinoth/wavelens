@@ -1,5 +1,5 @@
 :root {
-  --background: #e8e8e3;
+  --background: #d5d5d5;
   --panel: rgba(250, 250, 247, 0.94);
   --panel-solid: #fafaf7;
   --text: #181818;
@@ -13,7 +13,7 @@
 }
 
 html.dark-theme {
-  --background: #111312;
+  --background: #252525;
   --panel: rgba(20, 23, 21, 0.94);
   --panel-solid: #141715;
   --text: #eeeeea;
@@ -32,11 +32,11 @@ html, body {
   width: 100%;
   height: 100%;
   margin: 0;
+  background: var(--background);
 }
 
 body > * {
   overflow: hidden;
-  background: var(--background);
   color: var(--text);
   font-family: var(--sans-serif-font);
   transition: all 500ms;
@@ -61,7 +61,7 @@ button, input {
 
 .leaflet-container {
   font-family: var(--sans-serif-font);
-  background: #d8d8d3;
+  background: var(--background);
 }
 
 .leaflet-container > img {
@@ -80,7 +80,7 @@ html.dark-theme .leaflet-tile {
 .leaflet-control-attribution {
   background: rgba(250, 250, 247, 0.8) !important;
   color: #666 !important;
-  font-family: var(--mono-font);
+  font-family: var(--sans-serif-font);
   font-size: 8px;
 }
 
@@ -99,9 +99,7 @@ html.dark-theme .leaflet-control-attribution {
   align-items: center;
   justify-content: space-between;
   padding: 0 22px;
-  background: var(--panel);
-  border-bottom: 1px solid var(--line);
-  backdrop-filter: blur(14px);
+  background: linear-gradient(var(--panel) 0%, transparent);
   z-index: 1000;
 }
 
@@ -133,16 +131,9 @@ html.dark-theme .leaflet-control-attribution {
 }
 
 .name {
+  font-family: var(--mono-font);
   font-size: 14px;
   font-weight: 500;
-}
-
-.descriptor {
-  margin-top: 2px;
-  color: var(--muted);
-  font-family: var(--mono-font);
-  font-size: 7px;
-  letter-spacing: 0.08em;
 }
 
 .topbar-right {
@@ -184,27 +175,30 @@ html.dark-theme .leaflet-control-attribution {
   border: 0;
   background: transparent;
   color: var(--muted);
-  font-family: var(--mono-font);
   font-size: 8px;
   cursor: pointer;
+  transition: 500ms;
 }
 
 .plain-button:hover {
   color: var(--text);
+  text-decoration: 0.5px underline;
+  text-underline-offset: 1px;
 }
 
 .console {
   position: fixed;
   top: 78px;
-  left: 22px;
-  bottom: 22px;
+  left: 18px;
+  bottom: 18px;
   width: 355px;
   display: flex;
   flex-direction: column;
-  background: var(--panel);
+  background: rgba(0,0,0,0.5);
   border: 1px solid var(--line);
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(20px);
   z-index: 900;
+  border-radius: 10px;
 }
 
 .frequency {
@@ -214,7 +208,7 @@ html.dark-theme .leaflet-control-attribution {
 
 .label, .section-head, .section-title {
   color: var(--muted);
-  font-family: var(--mono-font);
+  font-family: var(--sans-serif-font);
   font-size: 8px;
   letter-spacing: 0.08em;
 }
@@ -466,7 +460,7 @@ html.dark-theme .leaflet-control-attribution {
   gap: 7px;
   margin-top: 8px;
   color: var(--muted);
-  font-family: var(--mono-font);
+  font-family: var(--sans-serif-font);
   font-size: 7px;
 }
 
@@ -483,7 +477,7 @@ html.dark-theme .leaflet-control-attribution {
   padding: 35px 10px;
   text-align: center;
   color: var(--muted);
-  font-family: var(--mono-font);
+  font-family: var(--sans-serif-font);
   font-size: 8px;
 }
 
@@ -504,7 +498,7 @@ footer {
   padding: 0 18px;
   border-top: 1px solid var(--line);
   color: var(--faint);
-  font-family: var(--mono-font);
+  font-family: var(--sans-serif-font);
   font-size: 7px;
 }
 
@@ -580,7 +574,7 @@ footer {
 }
 
 .popup strong {
-  font-family: var(--mono-font);
+  font-family: var(--sans-serif-font);
   font-size: 10px;
 }
 

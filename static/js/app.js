@@ -1,15 +1,4 @@
-const bands = {
-  "160m": [1.8, 2.0],
-  "80m": [3.5, 4.0],
-  "40m": [7.0, 7.3],
-  "20m": [14.0, 14.35],
-  "15m": [21.0, 21.45],
-  "10m": [28.0, 29.7],
-  "6m": [50.0, 54.0],
-  "2m": [144.0, 148.0],
-};
-
-const frequencies = {
+const BAND_FREQUENCIES = {
   "160m": 1.9,
   "80m": 3.6,
   "40m": 7.1,
@@ -23,28 +12,45 @@ const frequencies = {
 const state = {
   band: localStorage.getItem("wavelens_band") || "20m",
   spots: [],
-  paused: false,
+  snapshotTime: null,
+};
+
+const elements = {
+  clock: document.getElementById("utc-clock"),
+  count: document.getElementById("stat-count"),
+  spots: document.getElementById("spots-list"),
+  filter: document.getElementById("callsign-filter"),
+  frequency: document.getElementById("freq-display"),
+  status: document.getElementById("connection-status"),
+  statusDot: document.getElementById("status-dot"),
+  feedState: document.getElementById("feed-state"),
+  lastUpdate: document.getElementById("last-update"),
+  update: document.getElementById("update-btn"),
+  clear: document.getElementById("clear-btn"),
+  export: document.getElementById("export-csv-btn"),
+  meter: document.getElementById("activity-meter"),
+  theme: document.getElementById("theme-toggle"),
+  zoomIn: document.getElementById("zoom-in"),
+  zoomOut: document.getElementById("zoom-out"),
+  allBands: document.getElementById("all-bands"),
 };
 
 const map = L.map("map", {
   zoomControl: false,
   minZoom: 2,
-  maxZoom: 18,
+  maxZoom: 17,
   worldCopyJump: true,
-}).setView([15, 0], 2);
+}).setView([20, 0], 2);
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 19,
-  noWrap: false,
   attribution: "&copy; OpenStreetMap contributors",
 }).addTo(map);
 
-const lines = L.layerGroup().addTo(map);
-const markers = L.layerGroup().addTo(map);
+const spotLayer = L.layerGroup().addTo(map);
+const lineLayer = L.layerGroup().addTo(map);
 
 let hubMarker = null;
-
-const $ = (id) => document.getElementById(id);
 
 function escapeHTML(value) {
   return String(value ?? "")
@@ -55,14 +61,14 @@ function escapeHTML(value) {
     .replaceAll("'", "&#039;");
 }
 
-function frequencyMHz(spot) {
-  const value = Number(spot.frequency);
+function getFrequencyMHz(spot) {
+  const frequency = Number(spot.frequency);
 
-  if (!Number.isFinite(value) || value <= 0) {
+  if (!Number.isFinite(frequency) || frequency <= 0) {
     return null;
   }
 
-  return value / 1000000;
+  return frequency / 1000000;
 }
 
 function getBand(frequency) {
@@ -70,7 +76,18 @@ function getBand(frequency) {
     return null;
   }
 
-  for (const [band, range] of Object.entries(bands)) {
+  const ranges = {
+    "160m": [1.8, 2.0],
+    "80m": [3.5, 4.0],
+    "40m": [7.0, 7.3],
+    "20m": [14.0, 14.35],
+    "15m": [21.0, 21.45],
+    "10m": [28.0, 29.7],
+    "6m": [50.0, 54.0],
+    "2m": [144.0, 148.0],
+  };
+
+  for (const [band, range] of Object.entries(ranges)) {
     if (frequency >= range[0] && frequency <= range[1]) {
       return band;
     }
@@ -79,44 +96,112 @@ function getBand(frequency) {
   return null;
 }
 
-function distance(lat1, lon1, lat2, lon2) {
-  const radius = 6371;
-  const rad = (value) => (value * Math.PI) / 180;
-
-  const dLat = rad(lat2 - lat1);
-  const dLon = rad(lon2 - lon1);
-
+function distanceBetween(lat1, lon1, lat2, lon2) {
+  const earthRadius = 6371;
+  const toRadians = (value) => (value * Math.PI) / 180;
+  const dLat = toRadians(lat2 - lat1);
+  const dLon = toRadians(lon2 - lon1);
   const a =
     Math.sin(dLat / 2) ** 2 +
-    Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLon / 2) ** 2;
-
-  return radius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    Math.cos(toRadians(lat1)) *
+      Math.cos(toRadians(lat2)) *
+      Math.sin(dLon / 2) ** 2;
+  return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function bearing(lat1, lon1, lat2, lon2) {
-  const rad = (value) => (value * Math.PI) / 180;
-
-  const deg = (value) => (value * 180) / Math.PI;
-
-  const y = Math.sin(rad(lon2 - lon1)) * Math.cos(rad(lat2));
-
+function calculateBearing(lat1, lon1, lat2, lon2) {
+  const toRadians = (value) => (value * Math.PI) / 180;
+  const toDegrees = (value) => (value * 180) / Math.PI;
+  const startLat = toRadians(lat1);
+  const endLat = toRadians(lat2);
+  const longitudeDifference = toRadians(lon2 - lon1);
+  const y = Math.sin(longitudeDifference) * Math.cos(endLat);
   const x =
-    Math.cos(rad(lat1)) * Math.sin(rad(lat2)) -
-    Math.sin(rad(lat1)) * Math.cos(rad(lat2)) * Math.cos(rad(lon2 - lon1));
-
-  return (deg(Math.atan2(y, x)) + 360) % 360;
+    Math.cos(startLat) * Math.sin(endLat) -
+    Math.sin(startLat) * Math.cos(endLat) * Math.cos(longitudeDifference);
+  let bearing = toDegrees(Math.atan2(y, x));
+  return (bearing + 360) % 360;
 }
 
-function markerIcon(hub = false) {
+function bearingName(degrees) {
+  const directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+  return directions[Math.round(degrees / 45) % 8];
+}
+
+function signalDescription(snr) {
+  const value = Number(snr);
+  if (!Number.isFinite(value)) {
+    return "UNKNOWN";
+  }
+  if (value >= 5) return "STRONG";
+  if (value >= -5) return "GOOD";
+  if (value >= -15) return "FAIR";
+  return "WEAK";
+}
+
+function updateClock() {
+  const now = new Date();
+  elements.clock.textContent = now.toUTCString().slice(17, 25);
+}
+
+updateClock();
+
+setInterval(updateClock, 1000);
+
+function selectBand(band) {
+  state.band = band;
+  localStorage.setItem("wavelens_band", band);
+  document.querySelectorAll(".band-btn").forEach((button) => {
+    button.classList.toggle("active", button.dataset.band === band);
+  });
+  elements.frequency.textContent = BAND_FREQUENCIES[band]?.toFixed(3) ?? "—";
+  render();
+}
+
+document.querySelectorAll(".band-btn").forEach((button) => {
+  button.addEventListener("click", () => selectBand(button.dataset.band));
+});
+
+elements.allBands?.addEventListener("click", () => {
+  state.band = null;
+  document
+    .querySelectorAll(".band-btn")
+    .forEach((button) => button.classList.remove("active"));
+  elements.frequency.textContent = "ALL";
+  render();
+});
+
+function getVisibleSpots() {
+  const query = elements.filter.value.trim().toLowerCase();
+  return state.spots.filter((spot) => {
+    const frequency = getFrequencyMHz(spot);
+    const band = getBand(frequency);
+    const matchesBand = !state.band || band === state.band;
+    if (!matchesBand) {
+      return false;
+    }
+    if (!query) {
+      return true;
+    }
+    const text = [spot.sender, spot.receiver, spot.mode, frequency]
+      .join(" ")
+      .toLowerCase();
+    return text.includes(query);
+  });
+}
+
+elements.filter.addEventListener("input", render);
+
+function createMarker(isHub = false) {
   return L.divIcon({
     className: "map-marker-wrapper",
     html: `
             <span class="map-marker ${
-              hub ? "map-marker-hub" : "map-marker-spot"
+              isHub ? "map-marker-hub" : "map-marker-spot"
             }"></span>
         `,
-    iconSize: hub ? [13, 13] : [8, 8],
-    iconAnchor: hub ? [6, 6] : [4, 4],
+    iconSize: isHub ? [18, 18] : [14, 14],
+    iconAnchor: isHub ? [9, 9] : [7, 7],
   });
 }
 
@@ -127,13 +212,17 @@ function showHub() {
     return;
   }
 
-  if (hubMarker) {
-    hubMarker.addTo(markers);
+  if (!Number.isFinite(Number(hub.lat)) || !Number.isFinite(Number(hub.lon))) {
     return;
   }
 
-  hubMarker = L.marker([hub.lat, hub.lon], {
-    icon: markerIcon(true),
+  if (hubMarker) {
+    hubMarker.addTo(spotLayer);
+    return;
+  }
+
+  hubMarker = L.marker([Number(hub.lat), Number(hub.lon)], {
+    icon: createMarker(true),
     keyboard: false,
   })
     .bindPopup(
@@ -142,18 +231,19 @@ function showHub() {
                 <strong>
                     ${escapeHTML(hub.callsign)}
                 </strong>
+
                 <span>
                     WaveLens station
                 </span>
             </div>
         `,
     )
-    .addTo(markers);
+    .addTo(spotLayer);
 }
 
 function drawMap(spots) {
-  markers.clearLayers();
-  lines.clearLayers();
+  spotLayer.clearLayers();
+  lineLayer.clearLayers();
 
   showHub();
 
@@ -162,183 +252,226 @@ function drawMap(spots) {
     const lon1 = Number(spot.lon1);
     const lat2 = Number(spot.lat2);
     const lon2 = Number(spot.lon2);
-
-    const start = Number.isFinite(lat1) && Number.isFinite(lon1);
-
-    const end = Number.isFinite(lat2) && Number.isFinite(lon2);
-
-    if (!start && !end) {
+    const validStart =
+      Number.isFinite(lat1) &&
+      Number.isFinite(lon1) &&
+      Math.abs(lat1) <= 90 &&
+      Math.abs(lon1) <= 180;
+    const validEnd =
+      Number.isFinite(lat2) &&
+      Number.isFinite(lon2) &&
+      Math.abs(lat2) <= 90 &&
+      Math.abs(lon2) <= 180;
+    if (!validStart && !validEnd) {
       return;
     }
 
-    if (start) {
+    const sender = escapeHTML(spot.sender || "Unknown");
+    const receiver = escapeHTML(spot.receiver || "Unknown");
+    const snr = escapeHTML(spot.snr ?? "—");
+
+    if (validStart) {
       L.marker([lat1, lon1], {
-        icon: markerIcon(),
+        icon: createMarker(false),
         keyboard: false,
       })
         .bindPopup(
           `
                     <div class="popup">
+
                         <strong>
-                            ${escapeHTML(spot.sender)}
+                            ${sender}
                         </strong>
+
                         <span>
-                            Sender · ${escapeHTML(spot.snr)} dB
+                            Sender · ${snr} dB
                         </span>
+
                     </div>
                 `,
         )
-        .addTo(markers);
+        .addTo(spotLayer);
     }
 
-    if (end) {
+    if (validEnd) {
       L.marker([lat2, lon2], {
-        icon: markerIcon(),
+        icon: createMarker(false),
         keyboard: false,
       })
         .bindPopup(
           `
                     <div class="popup">
+
                         <strong>
-                            ${escapeHTML(spot.receiver)}
+                            ${receiver}
                         </strong>
+
                         <span>
-                            Receiver · ${escapeHTML(spot.snr)} dB
+                            Receiver · ${snr} dB
                         </span>
+
                     </div>
                 `,
         )
-        .addTo(markers);
+        .addTo(spotLayer);
     }
 
-    if (start && end) {
+    if (validStart && validEnd) {
       L.polyline(
         [
           [lat1, lon1],
           [lat2, lon2],
         ],
         {
-          color: "#16865a",
+          color: "#16a36b",
           weight: 1,
-          opacity: 0.5,
-          dashArray: "3 6",
+          opacity: 0.4,
+          dashArray: "4 6",
           interactive: false,
         },
-      ).addTo(lines);
+      ).addTo(lineLayer);
     }
   });
 }
 
-function visibleSpots() {
-  const query = $("callsign-filter").value.trim().toLowerCase();
+function createSpotCard(spot, index) {
+  const frequency = getFrequencyMHz(spot);
 
-  return state.spots.filter((spot) => {
-    const frequency = frequencyMHz(spot);
+  const frequencyText =
+    frequency === null ? "Unknown" : `${frequency.toFixed(3)} MHz`;
 
-    const band = getBand(frequency);
+  const band = getBand(frequency) || "—";
 
-    if (state.band && band !== state.band) {
-      return false;
-    }
+  let distanceText = "—";
+  let bearingText = "—";
 
-    if (!query) {
-      return true;
-    }
+  if (
+    Number.isFinite(Number(spot.lat1)) &&
+    Number.isFinite(Number(spot.lon1)) &&
+    Number.isFinite(Number(spot.lat2)) &&
+    Number.isFinite(Number(spot.lon2))
+  ) {
+    const distance = distanceBetween(
+      Number(spot.lat1),
+      Number(spot.lon1),
+      Number(spot.lat2),
+      Number(spot.lon2),
+    );
 
-    return [spot.sender, spot.receiver, spot.mode, frequency]
-      .join(" ")
-      .toLowerCase()
-      .includes(query);
-  });
+    const bearing = calculateBearing(
+      Number(spot.lat1),
+      Number(spot.lon1),
+      Number(spot.lat2),
+      Number(spot.lon2),
+    );
+
+    distanceText =
+      distance >= 1000
+        ? `${(distance / 1000).toFixed(1)} Mm`
+        : `${Math.round(distance)} km`;
+
+    bearingText = `${Math.round(bearing)}° ${bearingName(bearing)}`;
+  }
+
+  const card = document.createElement("article");
+
+  card.className = "spot-card";
+
+  card.dataset.index = index;
+
+  card.innerHTML = `
+        <div class="spot-topline">
+
+            <span>
+                ${escapeHTML(spot.mode || "UNKNOWN")}
+            </span>
+
+            <span>
+                ${frequencyText}
+            </span>
+
+        </div>
+
+
+        <div class="spot-route">
+
+            <span>
+                ${escapeHTML(spot.sender || "?")}
+            </span>
+
+            <span class="route-arrow">
+                ->
+            </span>
+
+            <span>
+                ${escapeHTML(spot.receiver || "?")}
+            </span>
+
+        </div>
+
+
+        <div class="spot-info">
+
+            <span>
+                ${band}
+            </span>
+
+            <span>
+                ${distanceText}
+            </span>
+
+            <span>
+                ${bearingText}
+            </span>
+
+        </div>
+
+
+        <div class="spot-bottomline">
+
+            <span>
+                Signal
+            </span>
+
+            <strong>
+                ${escapeHTML(spot.snr ?? "—")} dB
+            </strong>
+
+            <span class="signal-label">
+                ${signalDescription(spot.snr)}
+            </span>
+
+        </div>
+    `;
+
+  card.addEventListener("click", () => focusSpot(spot));
+
+  return card;
 }
 
-function render() {
-  const spots = visibleSpots();
+function renderCards(spots) {
+  elements.spots.innerHTML = "";
 
-  $("stat-count").textContent = spots.length;
-
-  $("activity-meter").style.width = `${Math.min(spots.length * 8, 100)}%`;
-
-  renderSpots(spots);
-  drawMap(spots);
-}
-
-function renderSpots(spots) {
-  const container = $("spots-list");
-
-  container.innerHTML = "";
-
-  if (!spots.length) {
-    container.innerHTML = `
+  if (spots.length === 0) {
+    elements.spots.innerHTML = `
             <div class="empty-state">
-                <div>NO REPORTS</div>
+
+                <div>
+                    NO MATCHING SPOTS
+                </div>
+
                 <span>
-                    Waiting for propagation data
+                    Try another band or search term.
                 </span>
+
             </div>
         `;
+
     return;
   }
 
   spots.forEach((spot, index) => {
-    const frequency = frequencyMHz(spot);
-
-    const band = getBand(frequency) || "—";
-
-    let distanceText = "—";
-
-    if (
-      Number.isFinite(Number(spot.lat1)) &&
-      Number.isFinite(Number(spot.lon1)) &&
-      Number.isFinite(Number(spot.lat2)) &&
-      Number.isFinite(Number(spot.lon2))
-    ) {
-      distanceText = `${Math.round(
-        distance(
-          Number(spot.lat1),
-          Number(spot.lon1),
-          Number(spot.lat2),
-          Number(spot.lon2),
-        ),
-      )} km`;
-    }
-
-    const card = document.createElement("article");
-
-    card.className = "spot-card";
-
-    card.innerHTML = `
-            <div class="spot-topline">
-                <span>
-                    ${escapeHTML(spot.mode || "UNKNOWN")}
-                </span>
-
-                <span>
-                    ${frequency ? frequency.toFixed(3) : "—"} MHz
-                </span>
-            </div>
-
-            <div class="spot-route">
-                <span>
-                    ${escapeHTML(spot.sender || "?")}
-                </span>
-                <span class="route-arrow">
-                    →
-                </span>
-                <span>
-                    ${escapeHTML(spot.receiver || "?")}
-                </span>
-            </div>
-            <div class="spot-info">
-                <span>${band}</span>
-                <span>${distanceText}</span>
-                <span>${escapeHTML(spot.snr ?? "—")} dB</span>
-            </div>
-        `;
-
-    card.addEventListener("click", () => focusSpot(spot));
-
-    container.appendChild(card);
+    elements.spots.appendChild(createSpotCard(spot, index));
   });
 }
 
@@ -359,12 +492,13 @@ function focusSpot(spot) {
     points.push([Number(spot.lat2), Number(spot.lon2)]);
   }
 
-  if (!points.length) {
+  if (points.length === 0) {
     return;
   }
 
   if (points.length === 1) {
     map.setView(points[0], 6);
+
     return;
   }
 
@@ -374,13 +508,85 @@ function focusSpot(spot) {
   });
 }
 
-async function refresh() {
-  if (state.paused) {
+function render() {
+  const visibleSpots = getVisibleSpots();
+
+  renderCards(visibleSpots);
+
+  drawMap(visibleSpots);
+
+  elements.count.textContent = visibleSpots.length;
+
+  const meterValue = Math.min(visibleSpots.length * 8, 100);
+
+  elements.meter.style.width = `${meterValue}%`;
+}
+
+function setConnectionState(online) {
+  elements.status.textContent = online ? "RUNNING" : "OFFLINE";
+
+  elements.statusDot.classList.toggle("online", online);
+}
+
+function saveLocalSnapshot(spots, savedAt) {
+  try {
+    localStorage.setItem(
+      "wavelens_snapshot",
+      JSON.stringify({
+        saved_at: savedAt,
+        spots,
+      }),
+    );
+  } catch (error) {
+    console.warn("Could not save local snapshot.", error);
+  }
+}
+
+function loadLocalSnapshot() {
+  try {
+    const raw = localStorage.getItem("wavelens_snapshot");
+
+    if (!raw) {
+      return false;
+    }
+
+    const snapshot = JSON.parse(raw);
+
+    if (!Array.isArray(snapshot.spots)) {
+      return false;
+    }
+
+    state.spots = snapshot.spots;
+
+    state.snapshotTime = snapshot.saved_at
+      ? new Date(snapshot.saved_at * 1000)
+      : null;
+
+    updateSnapshotLabel();
+
+    render();
+
+    return true;
+  } catch (error) {
+    console.warn("Could not load local snapshot.", error);
+
+    return false;
+  }
+}
+
+function updateSnapshotLabel() {
+  if (!state.snapshotTime) {
+    elements.lastUpdate.textContent = "—";
+
     return;
   }
 
+  elements.lastUpdate.textContent = "Last updated: " + state.snapshotTime.toUTCString().slice(17, 25);
+}
+
+async function loadSnapshot(replaceLocal = true) {
   try {
-    const response = await fetch("/api/spots", {
+    const response = await fetch(`/api/snapshot?_=${Date.now()}`, {
       cache: "no-store",
     });
 
@@ -388,106 +594,202 @@ async function refresh() {
       throw new Error(`HTTP ${response.status}`);
     }
 
-    const spots = await response.json();
+    const data = await response.json();
 
-    state.spots = Array.isArray(spots) ? spots : [];
+    if (!Array.isArray(data.spots)) {
+      throw new Error("Invalid snapshot");
+    }
 
-    $("connection-status").textContent = "LIVE";
+    if (replaceLocal || state.spots.length === 0) {
+      state.spots = data.spots;
 
-    $("status-dot").classList.add("online");
+      state.snapshotTime = data.saved_at
+        ? new Date(data.saved_at * 1000)
+        : null;
 
-    $("last-update").textContent = new Date().toISOString().slice(11, 19);
+      saveLocalSnapshot(state.spots, data.saved_at);
+
+      updateSnapshotLabel();
+
+      render();
+    }
+
+    setConnectionState(true);
+
+    elements.feedState.textContent = "SNAPSHOT";
+  } catch (error) {
+    console.error("WaveLens snapshot:", error);
+
+    setConnectionState(false);
+  }
+}
+
+async function updateSnapshot() {
+  elements.update.disabled = true;
+
+  elements.update.textContent = "UPDATING";
+
+  try {
+    const response = await fetch("/api/snapshot/update", {
+      method: "POST",
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    state.spots = Array.isArray(data.spots) ? data.spots : [];
+
+    state.snapshotTime = data.saved_at
+      ? new Date(data.saved_at * 1000)
+      : new Date();
+
+    saveLocalSnapshot(state.spots, data.saved_at);
+
+    updateSnapshotLabel();
+
+    elements.feedState.textContent = "UPDATED";
 
     render();
+
+    setConnectionState(true);
   } catch (error) {
-    console.error(error);
+    console.error("Could not update snapshot:", error);
 
-    $("connection-status").textContent = "OFFLINE";
+    elements.feedState.textContent = "ERROR";
+  } finally {
+    elements.update.disabled = false;
 
-    $("status-dot").classList.remove("online");
+    elements.update.textContent = "UPDATE";
   }
 }
 
-function setBand(band) {
-  state.band = band;
+elements.update.addEventListener("click", updateSnapshot);
 
-  if (band) {
-    localStorage.setItem("wavelens_band", band);
-  } else {
-    localStorage.removeItem("wavelens_band");
+elements.clear.addEventListener("click", () => {
+  state.spots = [];
+
+  render();
+
+  elements.feedState.textContent = "CLEARED";
+
+  elements.lastUpdate.textContent = "cleared";
+});
+
+function csvEscape(value) {
+  return `"${String(value ?? "").replaceAll('"', '""')}"`;
+}
+
+function exportCSV() {
+  const spots = getVisibleSpots();
+
+  if (spots.length === 0) {
+    elements.feedState.textContent = "NO DATA";
+
+    return;
   }
 
-  document.querySelectorAll(".band-btn").forEach((button) => {
-    button.classList.toggle("active", button.dataset.band === band);
+  const rows = [
+    [
+      "Sender",
+      "Receiver",
+      "Frequency",
+      "Band",
+      "Mode",
+      "SNR",
+      "Sender Grid",
+      "Receiver Grid",
+      "Sender Latitude",
+      "Sender Longitude",
+      "Receiver Latitude",
+      "Receiver Longitude",
+      "Timestamp",
+    ],
+  ];
+
+  spots.forEach((spot) => {
+    const frequency = getFrequencyMHz(spot);
+
+    rows.push([
+      spot.sender,
+      spot.receiver,
+
+      frequency === null ? "" : frequency.toFixed(3),
+
+      getBand(frequency) || "",
+
+      spot.mode,
+      spot.snr,
+
+      spot.sender_grid,
+      spot.receiver_grid,
+
+      spot.lat1,
+      spot.lon1,
+
+      spot.lat2,
+      spot.lon2,
+
+      spot.timestamp ? new Date(spot.timestamp * 1000).toISOString() : "",
+    ]);
   });
 
-  $("freq-display").textContent = band ? frequencies[band].toFixed(3) : "ALL";
+  const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\r\n");
 
-  $("active-band").textContent = band ? band.toUpperCase() : "ALL";
+  const blob = new Blob([csv], {
+    type: "text/csv;charset=utf-8",
+  });
 
-  render();
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+
+  link.href = url;
+
+  link.download = `wavelens-${new Date()
+    .toISOString()
+    .slice(0, 19)
+    .replaceAll(":", "-")}.csv`;
+
+  document.body.appendChild(link);
+
+  link.click();
+
+  link.remove();
+
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  elements.feedState.textContent = "CSV EXPORTED";
 }
 
-document.querySelectorAll(".band-btn").forEach((button) => {
-  button.addEventListener("click", () => setBand(button.dataset.band));
-});
-
-$("all-bands").addEventListener("click", () => setBand(null));
-
-$("callsign-filter").addEventListener("input", render);
-
-$("pause-btn").addEventListener("click", () => {
-  state.paused = !state.paused;
-
-  $("pause-btn").textContent = state.paused ? "RESUME" : "PAUSE";
-
-  $("feed-state").textContent = state.paused ? "PAUSED" : "LIVE";
-});
-
-$("clear-btn").addEventListener("click", () => {
-  state.spots = [];
-  render();
-
-  $("last-update").textContent = "CLEARED";
-});
-
-$("zoom-in").addEventListener("click", () => map.zoomIn());
-
-$("zoom-out").addEventListener("click", () => map.zoomOut());
-
-$("theme-toggle").addEventListener("click", () => {
-  const light =
-    document.documentElement.classList.toggle("dark-theme") === false;
-
-  localStorage.setItem("wavelens_theme", light ? "light" : "dark");
-});
-
-function updateClock() {
-  const now = new Date();
-
-  $("utc-clock").textContent = now.toISOString().slice(11, 19);
-}
+elements.export.addEventListener("click", exportCSV);
 
 function loadTheme() {
-  const theme = localStorage.getItem("wavelens_theme");
+  const theme = localStorage.getItem("wavelens_theme") || "dark";
 
-  if (theme !== "light") {
-    document.documentElement.classList.add("dark-theme");
-  }
+  document.documentElement.classList.toggle("dark-theme", theme === "dark");
 }
+
+elements.theme.addEventListener("click", () => {
+  const dark = document.documentElement.classList.toggle("dark-theme");
+
+  localStorage.setItem("wavelens_theme", dark ? "dark" : "light");
+});
+
+elements.zoomIn.addEventListener("click", () => map.zoomIn());
+
+elements.zoomOut.addEventListener("click", () => map.zoomOut());
 
 loadTheme();
 
-setBand(state.band);
+selectBand(state.band);
 
-updateClock();
+loadLocalSnapshot();
 
-setInterval(updateClock, 1000);
+loadSnapshot(true);
 
-refresh();
-
-setInterval(refresh, 5000);
-
-setTimeout(() => map.invalidateSize(), 250);
+setTimeout(() => map.invalidateSize(), 300);
 
 window.addEventListener("resize", () => map.invalidateSize());

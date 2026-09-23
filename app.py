@@ -7,7 +7,7 @@ import os
 import threading
 import time
 from collections import deque
-
+from pathlib import Path
 
 HOST = "0.0.0.0"
 PORT = int(os.getenv("PORT", "5001"))
@@ -32,7 +32,6 @@ BANDS = {
     "2m": (144.0, 148.0)
 }
 
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s"
@@ -42,6 +41,11 @@ logger = logging.getLogger("wavelens")
 
 app = Flask(__name__)
 
+CACHE_DIR = Path("data")
+CACHE_FILE = CACHE_DIR / "spots.json"
+SNAPSHOT_FILE = CACHE_DIR / "snapshot.json"
+
+CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 BAND_SPOTS = {
     band: deque(maxlen=SPOTS_PER_BAND)
@@ -50,6 +54,152 @@ BAND_SPOTS = {
 
 spots_lock = threading.Lock()
 
+cache_dirty = False
+cache_dirty_lock = threading.Lock()
+
+def mark_cache_dirty():
+    global cache_dirty
+
+    with cache_dirty_lock:
+        cache_dirty = True
+
+def save_cache():
+    with spots_lock:
+        data = {
+            band: list(spots)
+            for band, spots in BAND_SPOTS.items()
+        }
+
+    payload = {
+        "saved_at": time.time(),
+        "bands": data
+    }
+
+    temporary_file = CACHE_DIR / "spots.tmp"
+
+    try:
+        with open(temporary_file, "w", encoding="utf-8") as file:
+            json.dump(payload, file, separators=(",", ":"))
+
+        os.replace(temporary_file, CACHE_FILE)
+
+    except Exception:
+        logger.exception("Could not save WaveLens cache.")
+
+
+def load_cache():
+    if not CACHE_FILE.exists():
+        logger.info("No existing spot cache found.")
+        return
+
+    try:
+        with open(CACHE_FILE, "r", encoding="utf-8") as file:
+            payload = json.load(file)
+
+        bands = payload.get("bands", {})
+
+        with spots_lock:
+            for band in BANDS:
+                BAND_SPOTS[band].clear()
+
+                for spot in bands.get(band, []):
+                    BAND_SPOTS[band].append(spot)
+
+        logger.info("Loaded cached WaveLens data.")
+
+    except Exception:
+        logger.exception("Could not load WaveLens cache.")
+
+
+def cache_writer():
+    global cache_dirty
+
+    while True:
+        time.sleep(5)
+
+        with cache_dirty_lock:
+            dirty = cache_dirty
+            cache_dirty = False
+
+        if dirty:
+            save_cache()
+
+load_cache()
+
+
+cache_thread = threading.Thread(
+    target=cache_writer,
+    name="wavelens-cache",
+    daemon=True
+)
+
+cache_thread.start()
+
+def create_snapshot():
+    with spots_lock:
+        bands = {
+            band: list(spots)
+            for band, spots in BAND_SPOTS.items()
+        }
+
+    snapshot = {
+        "saved_at": time.time(),
+        "bands": bands
+    }
+
+    temporary_file = CACHE_DIR / "snapshot.tmp"
+
+    try:
+        with open(
+            temporary_file,
+            "w",
+            encoding="utf-8"
+        ) as file:
+            json.dump(
+                snapshot,
+                file,
+                separators=(",", ":")
+            )
+
+        os.replace(
+            temporary_file,
+            SNAPSHOT_FILE
+        )
+
+        logger.info("Created new WaveLens snapshot.")
+
+        return snapshot
+
+    except Exception:
+        logger.exception(
+            "Could not create WaveLens snapshot."
+        )
+
+        return None
+
+
+def load_snapshot():
+    if not SNAPSHOT_FILE.exists():
+        logger.info(
+            "No snapshot exists yet. Creating one from cache."
+        )
+
+        return create_snapshot()
+
+    try:
+        with open(
+            SNAPSHOT_FILE,
+            "r",
+            encoding="utf-8"
+        ) as file:
+            return json.load(file)
+
+    except Exception:
+        logger.exception(
+            "Could not load WaveLens snapshot."
+        )
+
+        return create_snapshot()
 
 def get_band(frequency):
     try:
@@ -99,11 +249,20 @@ def grid_to_latlon(grid):
 
         return lat, lon
 
-    except (TypeError, ValueError, IndexError):
+    except (
+        TypeError,
+        ValueError,
+        IndexError
+    ):
         return None, None
 
-
-def on_connect(client, userdata, flags, reason_code, properties=None):
+def on_connect(
+    client,
+    userdata,
+    flags,
+    reason_code,
+    properties=None
+):
     code = (
         reason_code.value
         if hasattr(reason_code, "value")
@@ -115,7 +274,9 @@ def on_connect(client, userdata, flags, reason_code, properties=None):
             "Connected to PSK Reporter MQTT broker."
         )
 
-        client.subscribe("pskr/filter/v2/#")
+        client.subscribe(
+            "pskr/filter/v2/#"
+        )
 
         logger.info(
             "Subscribed to the full PSK Reporter MQTT feed."
@@ -155,7 +316,10 @@ def on_message(client, userdata, msg):
 
         try:
             frequency = int(frequency)
-        except (TypeError, ValueError):
+        except (
+            TypeError,
+            ValueError
+        ):
             frequency = 0
 
         band = get_band(frequency)
@@ -167,7 +331,10 @@ def on_message(client, userdata, msg):
 
         try:
             snr = float(snr)
-        except (TypeError, ValueError):
+        except (
+            TypeError,
+            ValueError
+        ):
             snr = 0
 
         spot = {
@@ -192,6 +359,8 @@ def on_message(client, userdata, msg):
 
         with spots_lock:
             BAND_SPOTS[band].appendleft(spot)
+
+        mark_cache_dirty()
 
     except json.JSONDecodeError:
         logger.warning(
@@ -249,7 +418,6 @@ mqtt_thread = threading.Thread(
 
 mqtt_thread.start()
 
-
 @app.route("/")
 def index():
     return render_template(
@@ -261,6 +429,16 @@ def index():
         }
     )
 
+@app.route("/map")
+def map_page():
+    return render_template(
+        "map.html",
+        hub={
+            "lat": HUB_LAT,
+            "lon": HUB_LON,
+            "callsign": HUB_CALLSIGN
+        }
+    )
 
 @app.route("/api/spots")
 def get_spots():
@@ -276,6 +454,73 @@ def get_spots():
     )
 
     return jsonify(spots)
+
+
+@app.route("/api/snapshot")
+def get_snapshot():
+    snapshot = load_snapshot()
+
+    if snapshot is None:
+        return jsonify({
+            "saved_at": None,
+            "bands": {}
+        })
+
+    spots = []
+
+    for band_spots in snapshot.get(
+        "bands",
+        {}
+    ).values():
+        spots.extend(band_spots)
+
+    spots.sort(
+        key=lambda spot: spot.get(
+            "timestamp",
+            0
+        ),
+        reverse=True
+    )
+
+    return jsonify({
+        "saved_at": snapshot.get(
+            "saved_at"
+        ),
+        "spots": spots
+    })
+
+
+@app.route(
+    "/api/snapshot/update",
+    methods=["POST"]
+)
+def update_snapshot():
+    snapshot = create_snapshot()
+
+    if snapshot is None:
+        return jsonify({
+            "error": "Could not create snapshot"
+        }), 500
+
+    spots = []
+
+    for band_spots in snapshot[
+        "bands"
+    ].values():
+        spots.extend(band_spots)
+
+    spots.sort(
+        key=lambda spot: spot.get(
+            "timestamp",
+            0
+        ),
+        reverse=True
+    )
+
+    return jsonify({
+        "saved_at": snapshot["saved_at"],
+        "spots": spots
+    })
 
 
 @app.route("/api/spots/<band>")
@@ -321,9 +566,10 @@ def health():
         "status": "ok",
         "spots": total,
         "bands": stats,
-        "mqtt": MQTT_HOST
+        "mqtt": MQTT_HOST,
+        "cache": CACHE_FILE.exists(),
+        "snapshot": SNAPSHOT_FILE.exists()
     })
-
 
 if __name__ == "__main__":
     logger.info(
